@@ -42,7 +42,4 @@ public abstract class BaseEntity {
 
     @Column(nullable = false)
     private Boolean deleted = false;
-
-    @Column(nullable = false)
-    private Boolean active = true;
 }
