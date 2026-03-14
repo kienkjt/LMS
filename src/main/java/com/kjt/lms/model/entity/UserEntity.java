@@ -64,6 +64,9 @@ public class UserEntity extends BaseEntity {
     @Column(name = "ai_preferences", columnDefinition = "TEXT")
     private String aiPreferences;
 
+    @Column(name = "is_verified", nullable = false)
+    private Boolean isVerified = false;
+
     @Column(name = "active", nullable = false)
     @Convert(converter = CommonStatusEnumConverter.class)
     private CommonStatusEnum active = CommonStatusEnum.ACTIVE;

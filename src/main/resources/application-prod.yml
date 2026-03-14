@@ -7,3 +7,16 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    fallback-to-system-locale: true
+
+otp:
+  expiration-minutes: 10
+  max-attempts: 5
+  rate-limit-requests-per-hour: 5
+
+app:
+  name: LMS System

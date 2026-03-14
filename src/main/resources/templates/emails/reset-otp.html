@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Đặt lại mật khẩu</title>
+</head>
+
+<body style="font-family: Arial; background:#f4f6f8; padding:20px;">
+
+<table width="100%">
+    <tr>
+        <td align="center">
+
+            <table width="600" style="background:white;padding:30px;border-radius:8px">
+
+                <h2 style="color:#333" th:text="${appName}"></h2>
+
+                <p>Bạn yêu cầu đặt lại mật khẩu.</p>
+
+                <p>Sử dụng mã OTP dưới đây:</p>
+
+                <div style="text-align:center;margin:30px">
+                    <span style="font-size:32px;font-weight:bold;color:#ff5722"
+                          th:text="${otpCode}">
+                    </span>
+                </div>
+
+                <p>Mã có hiệu lực trong
+                    <strong th:text="${expirationMinutes}"></strong> phút.</p>
+
+                <p>Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email.</p>
+
+                <br>
+
+                <p>Trân trọng,<br>
+                    <strong th:text="${appName}"></strong></p>
+
+            </table>
+
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

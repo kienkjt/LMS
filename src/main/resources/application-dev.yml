@@ -7,10 +7,52 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+#    open-in-view: false
     show-sql: true
     properties:
       hibernate:
         format_sql: true
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+
 server:
-  port: 8080
+  port: ${SERVER_PORT}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: ${JWT_EXPIRATION}
+  refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION}
+
+otp:
+  expiration-minutes: 10
+  max-attempts: 5
+  rate-limit-requests-per-hour: 5
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
+    operationsSorter: method
+    try-it-out-enabled: true
+    filter: true
+
+app:
+  name: LMS System

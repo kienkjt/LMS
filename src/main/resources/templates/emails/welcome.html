@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Chào mừng</title>
+</head>
+
+<body style="font-family: Arial, sans-serif; background:#f4f6f8; padding:20px;">
+
+<table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center">
+
+            <!-- Email Container -->
+            <table width="600" cellpadding="0" cellspacing="0"
+                   style="background:#ffffff; padding:30px; border-radius:8px;">
+
+                <!-- Title -->
+                <tr>
+                    <td>
+                        <h2 style="color:#4CAF50; margin-top:0;">
+                            🎉 Chào mừng bạn!
+                        </h2>
+                    </td>
+                </tr>
+
+                <!-- Greeting -->
+                <tr>
+                    <td>
+                        <p>
+                            Xin chào
+                            <strong th:text="${fullName}"></strong>,
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Message -->
+                <tr>
+                    <td>
+                        <p>
+                            Cảm ơn bạn đã đăng ký tài khoản tại
+                            <strong th:text="${appName}">Application</strong>.
+                        </p>
+
+                        <p>
+                            Bây giờ bạn có thể đăng nhập và bắt đầu học tập ngay.
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Button -->
+                <tr>
+                    <td align="center" style="padding:30px 0;">
+                        <a href="#"
+                           style="background:#4CAF50;
+                                  color:#ffffff;
+                                  padding:12px 25px;
+                                  text-decoration:none;
+                                  border-radius:5px;
+                                  display:inline-block;">
+                            Truy cập hệ thống
+                        </a>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td>
+                        <p>Chúc bạn học tập hiệu quả!</p>
+
+                        <p>
+                            Trân trọng,<br>
+                            <strong th:text="${appName}"></strong>
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

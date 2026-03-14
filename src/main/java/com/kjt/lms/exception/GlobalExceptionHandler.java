@@ -176,25 +176,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handle Null Pointer Exception
-     */
-    @ExceptionHandler(NullPointerException.class)
-    public ResponseEntity<APIResponse<Object>> handleNullPointerException(
-            NullPointerException ex,
-            HttpServletRequest request) {
-
-        log.error("Null pointer exception at {}: ", request.getRequestURI(), ex);
-
-        APIResponse<Object> response = APIResponse.error(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "An unexpected error occurred. Please contact support."
-        );
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-    }
-
-    /**
-     * Handle Runtime Exception
+     * Handle Runtime Exception (fallback cho tất cả RuntimeException không được handle cụ thể)
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<APIResponse<Object>> handleRuntimeException(
@@ -205,7 +187,7 @@ public class GlobalExceptionHandler {
 
         APIResponse<Object> response = APIResponse.error(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "An error occurred: " + ex.getMessage()
+                "An error occurred. Please try again later."
         );
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
