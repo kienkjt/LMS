@@ -48,7 +48,7 @@ public class EmailServiceImpl implements EmailService {
 
             Context context = new Context();
             context.setVariable("otpCode", otpCode);
-            context.setVariable("expirationMinutes", 10);
+            context.setVariable("expirationMinutes", 5);
             context.setVariable("appName", appName);
 
             String htmlContent = templateEngine.process(templateName, context);
