@@ -1,19 +1,35 @@
 package com.kjt.lms.config;
 
 import org.springframework.data.domain.AuditorAware;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
-public class AuditorAwareImpl implements AuditorAware<String> {
+public class AuditorAwareImpl implements AuditorAware<UUID> {
 
     @Override
-    public Optional<String> getCurrentAuditor() {
+    public Optional<UUID> getCurrentAuditor() {
 
-        // tạm thời hardcode
-        return Optional.of("SYSTEM");
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        // Sau này có Spring Security sẽ lấy từ SecurityContext
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return Optional.empty();
+        }
+
+        Object principal = authentication.getPrincipal();
+
+        if (principal instanceof String userId) {
+            try {
+                return Optional.of(UUID.fromString(userId));
+            } catch (Exception e) {
+                return Optional.empty();
+            }
+        }
+
+        return Optional.empty();
     }
 }

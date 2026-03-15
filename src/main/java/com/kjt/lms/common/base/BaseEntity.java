@@ -28,8 +28,9 @@ public abstract class BaseEntity {
     private UUID id;
 
     @CreatedBy
-    @Column(updatable = false)
-    private String createdBy;
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(length = 36, updatable = false)
+    private UUID createdById;
 
     @CreatedDate
     @Column(updatable = false)
@@ -37,7 +38,9 @@ public abstract class BaseEntity {
     private LocalDateTime createdAt;
 
     @LastModifiedBy
-    private String updatedBy;
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(length = 36)
+    private UUID updatedById;
 
     @LastModifiedDate
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
