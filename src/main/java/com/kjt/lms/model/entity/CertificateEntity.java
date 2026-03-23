@@ -40,6 +40,6 @@ public class CertificateEntity extends BaseEntity {
     @Column(name = "certificate_url", length = 500)
     private String certificateUrl;
 
-    @Column(name = "issused_at")
+    @Column(name = "issued_at")
     private LocalDate issuedAt;
 }

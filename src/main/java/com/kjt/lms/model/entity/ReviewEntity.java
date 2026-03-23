@@ -36,9 +36,6 @@ public class ReviewEntity extends BaseEntity {
     @Column(name = "replied_at")
     private LocalDateTime repliedAt;
 
-    @Column(name = "helpful_count")
-    private Integer helpfulCount = 0;
-
     @Column(name = "active", nullable = false)
     @Convert(converter = CommonStatusEnumConverter.class)
     private CommonStatusEnum active = CommonStatusEnum.ACTIVE;

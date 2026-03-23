@@ -47,9 +47,6 @@ public class LessonEntity extends BaseEntity {
     @Column(name = "content", columnDefinition = "LONGTEXT")
     private String content;
 
-    @Column(name = "sort_order", nullable = false)
-    private Integer sortOrder = 0;
-
     @Column(name = "free_preview", nullable = false)
     @Convert(converter = YesNoEnumConverter.class)
     private YesNoEnum freePreview;

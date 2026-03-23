@@ -37,9 +37,6 @@ public class QuizEntity extends BaseEntity {
     @Column(name = "max_attempts")
     private Integer maxAttempts;
 
-    @Column(name = "ai_generated", nullable = false)
-    private Boolean aiGenerated = false;
-
     @Column(name = "shuffle_questions", nullable = false)
     private Boolean shuffleQuestions = false;
 }

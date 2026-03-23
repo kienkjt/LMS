@@ -61,9 +61,6 @@ public class UserEntity extends BaseEntity {
     @Column(name = "total_revenue", precision = 12, scale = 2)
     private BigDecimal totalRevenue = BigDecimal.ZERO;
 
-    @Column(name = "ai_preferences", columnDefinition = "TEXT")
-    private String aiPreferences;
-
     @Column(name = "is_verified", nullable = false)
     private Boolean isVerified = false;
 

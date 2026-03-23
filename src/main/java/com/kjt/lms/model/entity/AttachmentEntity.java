@@ -32,7 +32,4 @@ public class AttachmentEntity extends BaseEntity {
 
     @Column(name = "file_size")
     private Long fileSize;
-
-    @Column(name = "sort_order", nullable = false)
-    private Integer sortOrder;
 }

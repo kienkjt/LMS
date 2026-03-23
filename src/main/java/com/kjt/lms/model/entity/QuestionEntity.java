@@ -37,8 +37,5 @@ public class QuestionEntity extends BaseEntity {
     private String explanation;
 
     @Column(nullable = false)
-    private Integer sortOrder;
-
-    @Column(nullable = false)
     private Integer points;
 }

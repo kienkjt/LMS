@@ -24,9 +24,6 @@ public class ChapterEntity extends BaseEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "sort_order", nullable = false)
-    private Integer sortOrder;
-
     @Column(name = "total_lessons")
     private Integer totalLessons;
 
