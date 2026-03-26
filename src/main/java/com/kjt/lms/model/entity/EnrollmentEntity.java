@@ -27,12 +27,14 @@ public class EnrollmentEntity extends BaseEntity {
     private UUID orderId;
 
     @Column(name = "progress_percent", nullable = false, precision = 5, scale = 2)
+    @Builder.Default
     private BigDecimal progressPercent = BigDecimal.ZERO;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
     @Column(name = "certificate_issued", nullable = false)
+    @Builder.Default
     private Boolean certificateIssued = false;
 
     @Column(name = "certificate_id")

@@ -52,8 +52,16 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void register(RegistrationRequestDto request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new DuplicateResourceException(messageProvider.getMessage("auth.register.emailExists"));
+        UserEntity existingUser = userRepository.findByEmail(request.getEmail()).orElse(null);
+
+        if (existingUser != null) {
+            if(Boolean.TRUE.equals(existingUser.getIsVerified())){
+                throw new DuplicateResourceException(messageProvider.getMessage("auth.register.emailExists"));
+            }
+            otpService.generateAndSaveOtp(request.getEmail(),"REGISTRATION");
+
+            log.info("Resend OTP for unverified user: {}", request.getEmail());
+            return;
         }
 
         // Get role by code (STUDENT or INSTRUCTOR)
@@ -187,16 +195,20 @@ public class AuthServiceImpl implements AuthService {
     public void verifyResetOtp(VerifyOtpRequestDto request) {
         String email = request.getEmail();
         otpService.validateOtp(email, "PASSWORD_RESET", request.getOtp());
+        otpService.markPasswordResetVerified(email);
     }
 
     @Override
     @Transactional
     public void resetPassword(ResetPasswordRequestDto request) {
+        otpService.requirePasswordResetVerified(request.getEmail());
+
         UserEntity user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("auth.login.emailNotFound")));
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        otpService.clearPasswordResetVerified(request.getEmail());
 
         // Send password reset confirmation email
         emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName());

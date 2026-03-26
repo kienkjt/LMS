@@ -42,6 +42,7 @@ public class LessonEntity extends BaseEntity {
     private String videoPublicId;
 
     @Column(name = "duration")
+    @Builder.Default
     private Integer duration = 0;
 
     @Column(name = "content", columnDefinition = "LONGTEXT")

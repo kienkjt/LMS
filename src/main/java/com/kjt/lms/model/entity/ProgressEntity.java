@@ -26,6 +26,7 @@ public class ProgressEntity extends BaseEntity {
     private UUID courseId;
 
     @Column(name = "completed", nullable = false)
+    @Builder.Default
     private Boolean completed = false;
 
     @Column(name = "last_position")

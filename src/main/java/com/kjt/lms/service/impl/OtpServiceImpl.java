@@ -23,14 +23,18 @@ public class OtpServiceImpl implements OtpService {
     private final MessageProvider messageProvider;
     private final EmailService emailService;
 
-    @Value("${otp.expiration-seconds:600}")
-    private long otpExpirationSeconds;
+    @Value("${otp.expiration-minutes:5}")
+    private long otpExpirationMinutes;
 
     @Value("${otp.max-attempts:5}")
     private int maxAttempts;
 
+    @Value("${otp.reset-verified-ttl-seconds:300}")
+    private long resetVerifiedTtlSeconds;
+
     private static final String OTP_PATTERN = "[0-9]{6}";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String RESET_VERIFIED_PREFIX = "PASSWORD_RESET_VERIFIED:";
 
     @Override
     public void generateAndSaveOtp(String email, String purpose) {
@@ -44,7 +48,7 @@ public class OtpServiceImpl implements OtpService {
                 .id(key)
                 .otpCode(otpCode)
                 .failedAttempts(0)
-                .expiration(otpExpirationSeconds)
+                .expiration(otpExpirationMinutes * 60)
                 .build();
 
         otpRedisRepository.save(otp);
@@ -99,6 +103,33 @@ public class OtpServiceImpl implements OtpService {
         log.info("OTP verified for email {} purpose {}", email, purpose);
     }
 
+    @Override
+    public void markPasswordResetVerified(String email) {
+        OtpRedis resetVerified = OtpRedis.builder()
+                .id(resetVerifiedKey(email))
+                .otpCode("VERIFIED")
+                .failedAttempts(0)
+                .expiration(resetVerifiedTtlSeconds)
+                .build();
+
+        otpRedisRepository.save(resetVerified);
+    }
+
+    @Override
+    public void requirePasswordResetVerified(String email) {
+        OtpRedis verified = otpRedisRepository.findById(resetVerifiedKey(email))
+                .orElseThrow(() -> new BusinessException(messageProvider.getMessage("auth.resetPassword.otpNotVerified")));
+
+        if (!"VERIFIED".equals(verified.getOtpCode())) {
+            throw new BusinessException(messageProvider.getMessage("auth.resetPassword.otpNotVerified"));
+        }
+    }
+
+    @Override
+    public void clearPasswordResetVerified(String email) {
+        otpRedisRepository.deleteById(resetVerifiedKey(email));
+    }
+
     private String generateSecureOtp() {
         int otp = 100000 + SECURE_RANDOM.nextInt(900000);
         return String.valueOf(otp);
@@ -106,5 +137,9 @@ public class OtpServiceImpl implements OtpService {
 
     private String buildKey(String email, String purpose) {
         return email + ":" + purpose;
+    }
+
+    private String resetVerifiedKey(String email) {
+        return RESET_VERIFIED_PREFIX + email;
     }
 }

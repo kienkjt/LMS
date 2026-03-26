@@ -31,6 +31,7 @@ public class QuizAnswerEntity extends BaseEntity {
     private String selectedAnswer;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean isCorrect = false;
 
     @Column(nullable = false)

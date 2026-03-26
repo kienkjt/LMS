@@ -9,9 +9,10 @@ public enum CourseStatusEnum {
 
     DRAFT("1", "Bản nháp"),
     PENDING_REVIEW("2", "Chờ duyệt"),
-    PUBLISHED("3", "Đã xuất bản"),
-    REJECTED("4", "Bị từ chối"),
-    ARCHIVED("5", "Đã lưu trữ");
+    APPROVED("3", "Được phê duyệt"),
+    PUBLISHED("4", "Đã xuất bản"),
+    REJECTED("5", "Bị từ chối"),
+    ARCHIVED("6", "Đã lưu trữ");
 
     private final String value;
     private final String description;

@@ -5,7 +5,6 @@ import com.kjt.lms.common.constants.NotificationTypeEnum;
 import com.kjt.lms.common.constants.NotificationTypeEnumConverter;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -32,6 +31,7 @@ public class NotificationEntity extends BaseEntity {
     private String message;
 
     @Column(name = "is_read", nullable = false)
+    @Builder.Default
     private Boolean read = false;
 
     @Column(name = "read_at")
