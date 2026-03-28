@@ -24,18 +24,23 @@ public class QuizAttemptEntity extends BaseEntity {
     private UUID quizId;
 
     @Column(name = "attempt_number", nullable = false)
+    @Builder.Default
     private Integer attemptNumber = 1;
 
     @Column(name = "score", nullable = false, precision = 5, scale = 2)
+    @Builder.Default
     private BigDecimal score = BigDecimal.ZERO;
 
     @Column(name = "total_points", nullable = false)
+    @Builder.Default
     private Integer totalPoints = 0;
 
     @Column(name = "earned_points", nullable = false)
+    @Builder.Default
     private Integer earnedPoints = 0;
 
     @Column(name = "passed", nullable = false)
+    @Builder.Default
     private Boolean passed = false;
 
     @Column(name = "started_at")

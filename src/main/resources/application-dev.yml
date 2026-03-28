@@ -48,7 +48,7 @@ jwt:
   refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION}
 
 otp:
-  expiration-minutes: 10
+  expiration-minutes: 5
   max-attempts: 5
   rate-limit-requests-per-hour: 5
 

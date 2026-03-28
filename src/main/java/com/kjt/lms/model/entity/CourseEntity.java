@@ -42,6 +42,7 @@ public class CourseEntity extends BaseEntity {
     private String previewVideoUrl;
 
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
     private BigDecimal price = BigDecimal.ZERO;
 
     @Column(name = "discount_price", precision = 10, scale = 2)
@@ -90,5 +91,6 @@ public class CourseEntity extends BaseEntity {
 
     @Column(name = "active", nullable = false)
     @Convert(converter = CommonStatusEnumConverter.class)
+    @Builder.Default
     private CommonStatusEnum active = CommonStatusEnum.ACTIVE;
 }

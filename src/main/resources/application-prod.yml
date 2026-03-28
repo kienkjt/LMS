@@ -14,7 +14,7 @@ spring:
     fallback-to-system-locale: true
 
 otp:
-  expiration-minutes: 10
+  expiration-minutes: 5
   max-attempts: 5
   rate-limit-requests-per-hour: 5
 

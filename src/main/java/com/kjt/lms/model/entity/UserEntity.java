@@ -59,12 +59,15 @@ public class UserEntity extends BaseEntity {
     private String providerId;
 
     @Column(name = "total_revenue", precision = 12, scale = 2)
+    @Builder.Default
     private BigDecimal totalRevenue = BigDecimal.ZERO;
 
     @Column(name = "is_verified", nullable = false)
+    @Builder.Default
     private Boolean isVerified = false;
 
     @Column(name = "active", nullable = false)
     @Convert(converter = CommonStatusEnumConverter.class)
+    @Builder.Default
     private CommonStatusEnum active = CommonStatusEnum.ACTIVE;
 }

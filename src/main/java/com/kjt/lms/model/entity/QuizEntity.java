@@ -38,5 +38,6 @@ public class QuizEntity extends BaseEntity {
     private Integer maxAttempts;
 
     @Column(name = "shuffle_questions", nullable = false)
+    @Builder.Default
     private Boolean shuffleQuestions = false;
 }

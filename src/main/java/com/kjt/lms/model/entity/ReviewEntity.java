@@ -38,5 +38,6 @@ public class ReviewEntity extends BaseEntity {
 
     @Column(name = "active", nullable = false)
     @Convert(converter = CommonStatusEnumConverter.class)
+    @Builder.Default
     private CommonStatusEnum active = CommonStatusEnum.ACTIVE;
 }
