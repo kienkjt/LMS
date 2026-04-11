@@ -7,23 +7,29 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface LessonRepository extends JpaRepository<LessonEntity, UUID> {
 
-    List<LessonEntity> findByCourseIdOrderByCreatedAtAsc(UUID courseId);
+    Optional<LessonEntity> findByIdAndDeletedFalse(UUID id);
 
-    List<LessonEntity> findByCourseIdAndChapterIdOrderByCreatedAtAsc(UUID courseId, UUID chapterId);
+    List<LessonEntity> findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(UUID courseId);
 
-    long countByCourseId(UUID courseId);
+    List<LessonEntity> findByCourseIdAndChapterIdAndDeletedFalseOrderByCreatedAtAsc(UUID courseId, UUID chapterId);
 
-    long countByChapterId(UUID chapterId);
+    boolean existsByChapterIdAndTitleIgnoreCaseAndDeletedFalse(UUID chapterId, String title);
 
-    @Query("SELECT COALESCE(SUM(l.duration), 0) FROM LessonEntity l WHERE l.courseId = :courseId")
+    boolean existsByChapterIdAndTitleIgnoreCaseAndDeletedFalseAndIdNot(UUID chapterId, String title, UUID id);
+
+    long countByCourseIdAndDeletedFalse(UUID courseId);
+
+    long countByChapterIdAndDeletedFalse(UUID chapterId);
+
+    @Query("SELECT COALESCE(SUM(l.duration), 0) FROM LessonEntity l WHERE l.courseId = :courseId AND l.deleted = false")
     Integer sumDurationByCourseId(@Param("courseId") UUID courseId);
 
-    @Query("SELECT COALESCE(SUM(l.duration), 0) FROM LessonEntity l WHERE l.chapterId = :chapterId")
+    @Query("SELECT COALESCE(SUM(l.duration), 0) FROM LessonEntity l WHERE l.chapterId = :chapterId AND l.deleted = false")
     Integer sumDurationByChapterId(@Param("chapterId") UUID chapterId);
 }
-

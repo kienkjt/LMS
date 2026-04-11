@@ -30,6 +30,11 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   data:
     redis:
       host: localhost
@@ -47,6 +52,11 @@ jwt:
   expiration-ms: ${JWT_EXPIRATION}
   refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION}
 
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+
 otp:
   expiration-minutes: 5
   max-attempts: 5
@@ -61,3 +71,7 @@ springdoc:
 
 app:
   name: LMS System
+  profile:
+    avatar:
+      max-size-bytes: 5242880
+      allowed-content-types: image/jpeg,image/png,image/webp

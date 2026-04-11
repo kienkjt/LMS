@@ -269,8 +269,8 @@ public class CourseServiceImpl implements CourseService {
     }
 
     private CourseDetailResponseDto buildCourseDetailResponse(CourseEntity course) {
-        List<ChapterEntity> chapters = chapterRepository.findByCourseIdOrderByCreatedAtAsc(course.getId());
-        Map<UUID, List<LessonEntity>> lessonsByChapter = lessonRepository.findByCourseIdOrderByCreatedAtAsc(course.getId())
+        List<ChapterEntity> chapters = chapterRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(course.getId());
+        Map<UUID, List<LessonEntity>> lessonsByChapter = lessonRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(course.getId())
                 .stream()
                 .collect(Collectors.groupingBy(LessonEntity::getChapterId));
 

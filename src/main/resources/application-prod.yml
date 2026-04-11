@@ -13,6 +13,11 @@ spring:
     encoding: UTF-8
     fallback-to-system-locale: true
 
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+
 otp:
   expiration-minutes: 5
   max-attempts: 5
@@ -20,3 +25,7 @@ otp:
 
 app:
   name: LMS System
+  profile:
+    avatar:
+      max-size-bytes: ${AVATAR_MAX_SIZE_BYTES:5242880}
+      allowed-content-types: ${AVATAR_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
