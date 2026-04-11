@@ -2,9 +2,11 @@ package com.kjt.lms.mapper;
 
 import com.kjt.lms.model.entity.ChapterEntity;
 import com.kjt.lms.model.request.chapter.CreateChapterRequestDto;
+import com.kjt.lms.model.request.chapter.UpdateChapterRequestDto;
 import com.kjt.lms.model.response.ChapterResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 import java.util.UUID;
 
@@ -18,4 +20,10 @@ public interface ChapterMapper {
 
     @Mapping(target = "lessons", ignore = true)
     ChapterResponseDto toDto(ChapterEntity entity);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "courseId", ignore = true)
+    @Mapping(target = "totalLessons", ignore = true)
+    @Mapping(target = "totalDuration", ignore = true)
+    void updateEntity(UpdateChapterRequestDto request, @MappingTarget ChapterEntity entity);
 }

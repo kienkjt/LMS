@@ -12,7 +12,7 @@ import java.util.Arrays;
 @Configuration
 public class CorsConfig {
 
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:4200}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:4200,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}")
     private String[] allowedOrigins;
 
     @Value("${cors.allowed-methods:GET,POST,PUT,DELETE,PATCH,OPTIONS}")
@@ -34,7 +34,7 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList(allowedMethods));
         configuration.setAllowedHeaders(Arrays.asList(allowedHeaders));
         configuration.setExposedHeaders(Arrays.asList(exposedHeaders));

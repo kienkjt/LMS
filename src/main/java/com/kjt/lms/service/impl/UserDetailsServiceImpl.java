@@ -30,12 +30,16 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         RoleEntity role = roleRepository.findById(user.getRoleId())
                 .orElseThrow(() -> new RuntimeException("Role not found"));
 
+        String roleCode = role.getCode().toUpperCase();
+        String authority = roleCode.startsWith("ROLE_") ? roleCode : "ROLE_" + roleCode;
+
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())
                 .password(user.getPassword())
                 .authorities(Collections.singletonList(
-                        new SimpleGrantedAuthority("ROLE_" + role.getCode().toUpperCase())
+                        new SimpleGrantedAuthority(authority)
                 ))
                 .build();
     }
 }
+                        
