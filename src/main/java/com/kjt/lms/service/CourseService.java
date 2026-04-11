@@ -1,7 +1,13 @@
 package com.kjt.lms.service;
 
+import com.kjt.lms.common.constants.CommonStatusEnum;
+import com.kjt.lms.common.constants.CourseStatusEnum;
 import com.kjt.lms.model.request.course.CreateCourseRequestDto;
 import com.kjt.lms.model.request.course.UpdateCourseRequestDto;
+import com.kjt.lms.model.request.course.SearchCourseRequest;
+import com.kjt.lms.model.response.CourseCreateResponseDto;
+import com.kjt.lms.model.response.CourseDetailResponseDto;
+import com.kjt.lms.model.response.CourseListItemResponseDto;
 import com.kjt.lms.model.response.CourseResponseDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,7 +19,7 @@ public interface CourseService {
     /**
      * Create a new course
      */
-    CourseResponseDto createCourse(CreateCourseRequestDto request);
+    CourseCreateResponseDto createCourse(CreateCourseRequestDto request);
 
     /**
      * Update course
@@ -21,44 +27,35 @@ public interface CourseService {
     CourseResponseDto updateCourse(UUID courseId, UpdateCourseRequestDto request);
 
     /**
-     * Get course by ID
+     * Get course detail by ID
      */
-    CourseResponseDto getCourseById(UUID courseId);
-
-    /**
-     * Get course by slug
-     */
-    CourseResponseDto getCourseBySlug(String slug);
+    CourseDetailResponseDto getCourseById(UUID courseId);
 
     /**
      * Get all courses by instructor with pagination
      */
-    Page<CourseResponseDto> getInstructorCourses(Pageable pageable);
+    Page<CourseListItemResponseDto> getInstructorCourses(Pageable pageable);
 
     /**
-     * Get all published courses with pagination
+     * Search and filter courses (keyword, status, level, active)
+     * SearchCourseRequest defaults to PUBLISHED + ACTIVE status
      */
-    Page<CourseResponseDto> getPublishedCourses(Pageable pageable);
-
-    /**
-     * Search courses by keyword
-     */
-    Page<CourseResponseDto> searchCourses(String keyword, Pageable pageable);
+    Page<CourseListItemResponseDto> searchCourses(SearchCourseRequest request, Pageable pageable);
 
     /**
      * Get courses by category
      */
-    Page<CourseResponseDto> getCoursesByCategory(UUID categoryId, Pageable pageable);
+    Page<CourseListItemResponseDto> getCoursesByCategory(UUID categoryId, Pageable pageable);
 
     /**
      * Get top rated courses
      */
-    Page<CourseResponseDto> getTopRatedCourses(Pageable pageable);
+    Page<CourseListItemResponseDto> getTopRatedCourses(Pageable pageable);
 
     /**
      * Get trending courses
      */
-    Page<CourseResponseDto> getTrendingCourses(Pageable pageable);
+    Page<CourseListItemResponseDto> getTrendingCourses(Pageable pageable);
 
     /**
      * Publish course (change status to PUBLISHED)

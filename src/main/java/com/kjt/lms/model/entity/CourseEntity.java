@@ -26,9 +26,6 @@ public class CourseEntity extends BaseEntity {
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 
-    @Column(name = "slug", nullable = false, unique = true, length = 250)
-    private String slug;
-
     @Column(name = "short_description", columnDefinition = "TEXT")
     private String shortDescription;
 

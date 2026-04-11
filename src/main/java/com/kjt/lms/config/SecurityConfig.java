@@ -52,8 +52,10 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/courses/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
                         .requestMatchers("/api/v1/user/**").hasAnyRole("ADMIN", "INSTRUCTOR", "STUDENT")
                         .requestMatchers("/api/v1/courses/**").hasAnyRole("ADMIN", "INSTRUCTOR")
+                        .requestMatchers("/api/v1/categories/**").hasRole("ADMIN")
                         .anyRequest().authenticated());
 
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
