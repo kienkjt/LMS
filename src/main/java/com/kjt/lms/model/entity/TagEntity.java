@@ -16,9 +16,6 @@ public class TagEntity extends BaseEntity {
     @Column(name = "name", nullable = false, unique = true, length = 80)
     private String name;
 
-    @Column(name = "slug", nullable = false, unique = true, length = 100)
-    private String slug;
-
     @Column(name = "course_count", nullable = false)
     private Integer courseCount;
 }

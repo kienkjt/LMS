@@ -20,11 +20,6 @@ public class CreateCourseRequestDto {
     @Size(min = 5, max = 200, message = "{validation.title.size}")
     private String title;
 
-    @NotBlank(message = "{validation.slug.notBlank}")
-    @Pattern(regexp = "^[a-z0-9]+(?:-[a-z0-9]+)*$", message = "{validation.slug.pattern}")
-    @Size(max = 250, message = "{validation.slug.size}")
-    private String slug;
-
     @NotBlank(message = "{validation.shortDescription.notBlank}")
     @Size(min = 10, max = 1000, message = "{validation.shortDescription.size}")
     private String shortDescription;
@@ -40,7 +35,7 @@ public class CreateCourseRequestDto {
 
     @NotNull(message = "{validation.price.notNull}")
     @DecimalMin(value = "0.0", message = "{validation.price.min}")
-    @DecimalMax(value = "999999.99", message = "{validation.price.max}")
+    @DecimalMax(value = "99999999", message = "{validation.price.max}")
     private BigDecimal price;
 
     @DecimalMin(value = "0.0", message = "{validation.discountPrice.min}")

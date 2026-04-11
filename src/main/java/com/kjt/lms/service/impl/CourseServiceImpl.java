@@ -5,14 +5,24 @@ import com.kjt.lms.common.constants.CommonStatusEnum;
 import com.kjt.lms.common.constants.CourseStatusEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
-import com.kjt.lms.exception.DuplicateResourceException;
 import com.kjt.lms.exception.ResourceNotFoundException;
 import com.kjt.lms.mapper.CourseMapper;
+import com.kjt.lms.model.entity.ChapterEntity;
 import com.kjt.lms.model.entity.CourseEntity;
+import com.kjt.lms.model.entity.LessonEntity;
 import com.kjt.lms.model.request.course.CreateCourseRequestDto;
+import com.kjt.lms.model.request.course.SearchCourseRequest;
 import com.kjt.lms.model.request.course.UpdateCourseRequestDto;
+import com.kjt.lms.model.response.ChapterResponseDto;
+import com.kjt.lms.model.response.CourseCreateResponseDto;
+import com.kjt.lms.model.response.CourseDetailResponseDto;
+import com.kjt.lms.model.response.CourseListItemResponseDto;
 import com.kjt.lms.model.response.CourseResponseDto;
+import com.kjt.lms.model.response.LessonResponseDto;
+import com.kjt.lms.repository.CategoryRepository;
+import com.kjt.lms.repository.ChapterRepository;
 import com.kjt.lms.repository.CourseRepository;
+import com.kjt.lms.repository.LessonRepository;
 import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.CourseService;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +33,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,56 +45,23 @@ import java.util.UUID;
 public class CourseServiceImpl implements CourseService {
 
     private final CourseRepository courseRepository;
+    private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final ChapterRepository chapterRepository;
+    private final LessonRepository lessonRepository;
     private final CourseMapper courseMapper;
     private final MessageProvider messageProvider;
 
     @Override
     @Transactional
-    public CourseResponseDto createCourse(CreateCourseRequestDto request) {
-        // Get current instructor ID
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        UUID instructorId = userRepository.findByEmail(email)
-                .map(BaseEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
+    public CourseCreateResponseDto createCourse(CreateCourseRequestDto request) {
+        UUID instructorId = getCurrentUserId();
+        validateCategoryId(request.getCategoryId());
 
-        if (courseRepository.existsBySlug(request.getSlug())) {
-            throw new DuplicateResourceException(
-                    messageProvider.getMessage("exception.course.slugExists"));
-        }
-
-        // Create course entity
-        CourseEntity course = CourseEntity.builder()
-                .instructorId(instructorId)
-                .categoryId(request.getCategoryId())
-                .title(request.getTitle())
-                .slug(request.getSlug())
-                .shortDescription(request.getShortDescription())
-                .fullDescription(request.getFullDescription())
-                .thumbnail(request.getThumbnail())
-                .previewVideoUrl(request.getPreviewVideoUrl())
-                .price(request.getPrice())
-                .discountPrice(request.getDiscountPrice())
-                .level(request.getLevel())
-                .status(CourseStatusEnum.DRAFT)  // Default to DRAFT
-                .totalDuration(request.getTotalDuration())
-                .totalLessons(0)
-                .totalStudents(0)
-                .avgRating(0.0)
-                .totalReviews(0)
-                .language(request.getLanguage())
-                .certificate(request.getCertificate())
-                .requirements(request.getRequirements())
-                .whatYouWillLearn(request.getWhatYouWillLearn())
-                .active(CommonStatusEnum.ACTIVE)
-                .build();
-
-        CourseEntity savedCourse = courseRepository.save(course);
+        CourseEntity savedCourse = courseRepository.save(courseMapper.toCreateEntity(request, instructorId));
 
         log.info("Course created: {} by instructor: {}", savedCourse.getId(), instructorId);
-
-        return courseMapper.toDto(savedCourse);
+        return courseMapper.toCreateResponse(savedCourse);
     }
 
     @Override
@@ -90,132 +71,93 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        // Verify ownership
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        UUID instructorId = userRepository.findByEmail(email)
-                .map(BaseEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
+        UUID instructorId = getCurrentUserId();
+        validateCourseOwnership(course, instructorId);
+        validateCategoryId(request.getCategoryId());
 
-        if (!course.getInstructorId().equals(instructorId)) {
-            throw new BusinessException(
-                    messageProvider.getMessage("exception.course.notOwner"));
-        }
-
-        // Check if slug is changed and already exists
-        if (!course.getSlug().equals(request.getSlug()) &&
-            courseRepository.existsBySlug(request.getSlug())) {
-            throw new DuplicateResourceException(
-                    messageProvider.getMessage("exception.course.slugExists"));
-        }
-
-        // Update fields
-        course.setTitle(request.getTitle());
-        course.setSlug(request.getSlug());
-        course.setShortDescription(request.getShortDescription());
-        course.setFullDescription(request.getFullDescription());
-        course.setThumbnail(request.getThumbnail());
-        course.setPreviewVideoUrl(request.getPreviewVideoUrl());
-        course.setPrice(request.getPrice());
-        course.setDiscountPrice(request.getDiscountPrice());
-        course.setLevel(request.getLevel());
-        course.setTotalDuration(request.getTotalDuration());
-        course.setLanguage(request.getLanguage());
-        course.setCertificate(request.getCertificate());
-        course.setRequirements(request.getRequirements());
-        course.setWhatYouWillLearn(request.getWhatYouWillLearn());
-        course.setCategoryId(request.getCategoryId());
-
+        courseMapper.updateCourseFromRequest(request, course);
         CourseEntity updatedCourse = courseRepository.save(course);
 
         log.info("Course updated: {} by instructor: {}", courseId, instructorId);
-
         return courseMapper.toDto(updatedCourse);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public CourseResponseDto getCourseById(UUID courseId) {
+    public CourseDetailResponseDto getCourseById(UUID courseId) {
         CourseEntity course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        return courseMapper.toDto(course);
+        return buildCourseDetailResponse(course);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public CourseResponseDto getCourseBySlug(String slug) {
-        CourseEntity course = courseRepository.findBySlug(slug)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
-
-        return courseMapper.toDto(course);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<CourseResponseDto> getInstructorCourses(Pageable pageable) {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        UUID instructorId = userRepository.findByEmail(email)
-                .map(u -> u.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
-
+    public Page<CourseListItemResponseDto> getInstructorCourses(Pageable pageable) {
+        UUID instructorId = getCurrentUserId();
         return courseRepository.findByInstructorId(instructorId, pageable)
-                .map(courseMapper::toDto);
+                .map(courseMapper::toListItemDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CourseResponseDto> getPublishedCourses(Pageable pageable) {
-        return courseRepository.findByStatusAndActive(
-                CourseStatusEnum.PUBLISHED,
-                CommonStatusEnum.ACTIVE,
+    public Page<CourseListItemResponseDto> searchCourses(SearchCourseRequest request, Pageable pageable) {
+
+        Page<CourseListItemResponseDto> results = courseRepository.search(
+                request.getKeyword(),
+                request.getCourseStatus(),
+                request.getCourseLevel(),
+                request.getActive(),
                 pageable
-        ).map(courseMapper::toDto);
+        ).map(courseMapper::toListItemDto);
+
+        if (results.hasContent()) {
+            log.info("Search completed - found {} courses", results.getTotalElements());
+        } else {
+            log.info("Search completed - no courses found");
+        }
+
+        return results;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CourseResponseDto> searchCourses(String keyword, Pageable pageable) {
-        return courseRepository.searchByTitle(
-                keyword,
-                CourseStatusEnum.PUBLISHED,
-                CommonStatusEnum.ACTIVE,
-                pageable
-        ).map(courseMapper::toDto);
-    }
+    public Page<CourseListItemResponseDto> getCoursesByCategory(UUID categoryId, Pageable pageable) {
+        // Validate category exists AND not deleted
+        categoryRepository.findByIdAndDeletedFalse(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    messageProvider.getMessage("exception.category.notFound")));
 
-    @Override
-    @Transactional(readOnly = true)
-    public Page<CourseResponseDto> getCoursesByCategory(UUID categoryId, Pageable pageable) {
-        return courseRepository.findByCategoryIdAndStatusAndActive(
+        // Always filter PUBLISHED + ACTIVE (security enforcement)
+        return courseRepository.findCoursesByCategory(
                 categoryId,
                 CourseStatusEnum.PUBLISHED,
                 CommonStatusEnum.ACTIVE,
                 pageable
-        ).map(courseMapper::toDto);
+        ).map(courseMapper::toListItemDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CourseResponseDto> getTopRatedCourses(Pageable pageable) {
-        return courseRepository.findTopRatedCourses(
+    public Page<CourseListItemResponseDto> getTopRatedCourses(Pageable pageable) {
+        return courseRepository.search(
+                null,
                 CourseStatusEnum.PUBLISHED,
+                null,
                 CommonStatusEnum.ACTIVE,
                 pageable
-        ).map(courseMapper::toDto);
+        ).map(courseMapper::toListItemDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CourseResponseDto> getTrendingCourses(Pageable pageable) {
-        return courseRepository.findTrendingCourses(
+    public Page<CourseListItemResponseDto> getTrendingCourses(Pageable pageable) {
+        return courseRepository.search(
+                null,
                 CourseStatusEnum.PUBLISHED,
+                null,
                 CommonStatusEnum.ACTIVE,
                 pageable
-        ).map(courseMapper::toDto);
+        ).map(courseMapper::toListItemDto);
     }
 
     @Override
@@ -225,23 +167,27 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        // Verify ownership
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        UUID instructorId = userRepository.findByEmail(email)
-                .map(u -> u.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
+        UUID instructorId = getCurrentUserId();
+        validateCourseOwnership(course, instructorId);
 
-        if (!course.getInstructorId().equals(instructorId)) {
+        // Validate status workflow: check if already published
+        if (course.getStatus() == CourseStatusEnum.PUBLISHED) {
             throw new BusinessException(
-                    messageProvider.getMessage("exception.course.notOwner"));
+                    messageProvider.getMessage("exception.course.alreadyPublished"));
         }
+
+        // Validate only DRAFT or REJECTED can be published
+        if (!isPublishableStatus(course.getStatus())) {
+            throw new BusinessException(
+                    String.format("Cannot publish course in %s status", course.getStatus()));
+        }
+
+        log.info("Publishing course: {} (from {} to PUBLISHED)", courseId, course.getStatus());
 
         course.setStatus(CourseStatusEnum.PUBLISHED);
         CourseEntity updatedCourse = courseRepository.save(course);
 
         log.info("Course published: {} by instructor: {}", courseId, instructorId);
-
         return courseMapper.toDto(updatedCourse);
     }
 
@@ -252,23 +198,21 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        // Verify ownership
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        UUID instructorId = userRepository.findByEmail(email)
-                .map(BaseEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
+        UUID instructorId = getCurrentUserId();
+        validateCourseOwnership(course, instructorId);
 
-        if (!course.getInstructorId().equals(instructorId)) {
+        // Validate status workflow: only PUBLISHED can be unpublished
+        if (course.getStatus() != CourseStatusEnum.PUBLISHED) {
             throw new BusinessException(
-                    messageProvider.getMessage("exception.course.notOwner"));
+                    String.format("Cannot unpublish course in %s status", course.getStatus()));
         }
+
+        log.info("Unpublishing course: {} (from PUBLISHED to DRAFT)", courseId);
 
         course.setStatus(CourseStatusEnum.DRAFT);
         CourseEntity updatedCourse = courseRepository.save(course);
 
         log.info("Course unpublished: {} by instructor: {}", courseId, instructorId);
-
         return courseMapper.toDto(updatedCourse);
     }
 
@@ -279,19 +223,10 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        // Verify ownership
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        UUID instructorId = userRepository.findByEmail(email)
-                .map(u -> u.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
+        UUID instructorId = getCurrentUserId();
+        validateCourseOwnership(course, instructorId);
 
-        if (!course.getInstructorId().equals(instructorId)) {
-            throw new BusinessException(
-                    messageProvider.getMessage("exception.course.notOwner"));
-        }
-
-        course.setActive(CommonStatusEnum.DELETED);
+        course.setDeleted(true);
         courseRepository.save(course);
 
         log.info("Course deleted: {} by instructor: {}", courseId, instructorId);
@@ -332,5 +267,57 @@ public class CourseServiceImpl implements CourseService {
 
         return courseMapper.toDto(updatedCourse);
     }
-}
 
+    private CourseDetailResponseDto buildCourseDetailResponse(CourseEntity course) {
+        List<ChapterEntity> chapters = chapterRepository.findByCourseIdOrderByCreatedAtAsc(course.getId());
+        Map<UUID, List<LessonEntity>> lessonsByChapter = lessonRepository.findByCourseIdOrderByCreatedAtAsc(course.getId())
+                .stream()
+                .collect(Collectors.groupingBy(LessonEntity::getChapterId));
+
+        List<ChapterResponseDto> chapterResponses = chapters.stream()
+                .map(chapter -> {
+                    List<LessonResponseDto> lessons = lessonsByChapter
+                            .getOrDefault(chapter.getId(), Collections.emptyList())
+                            .stream()
+                            .map(courseMapper::toLessonDto)
+                            .toList();
+
+                    ChapterResponseDto chapterResponse = courseMapper.toChapterDto(chapter);
+                    chapterResponse.setLessons(lessons);
+                    return chapterResponse;
+                })
+                .toList();
+
+        CourseDetailResponseDto detail = courseMapper.toDetailDto(course);
+        detail.setChapters(chapterResponses);
+        return detail;
+    }
+
+    private UUID getCurrentUserId() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .map(BaseEntity::getId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.user.notfound")));
+    }
+
+    private void validateCategoryId(UUID categoryId) {
+        if (categoryId == null) {
+            return;
+        }
+
+        categoryRepository.findByIdAndDeletedFalse(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.category.notFound")));
+    }
+
+    private void validateCourseOwnership(CourseEntity course, UUID currentUserId) {
+        if (!course.getInstructorId().equals(currentUserId)) {
+            throw new BusinessException(messageProvider.getMessage("exception.course.notOwner"));
+        }
+    }
+
+    private boolean isPublishableStatus(CourseStatusEnum status) {
+        return status == CourseStatusEnum.DRAFT || status == CourseStatusEnum.REJECTED;
+    }
+}

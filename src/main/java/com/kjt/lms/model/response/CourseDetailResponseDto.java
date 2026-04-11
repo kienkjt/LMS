@@ -9,13 +9,14 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CourseResponseDto {
+public class CourseDetailResponseDto {
 
     private UUID id;
     private UUID instructorId;
@@ -38,10 +39,8 @@ public class CourseResponseDto {
     private String certificate;
     private String requirements;
     private String whatYouWillLearn;
-    private UUID reviewedBy;
     private String rejectReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private UUID createdById;
-    private UUID updatedById;
+    private List<ChapterResponseDto> chapters;
 }
