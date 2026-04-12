@@ -4,7 +4,7 @@ import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.model.request.profile.ChangePasswordRequest;
 import com.kjt.lms.model.request.profile.UpdateProfileRequest;
-import com.kjt.lms.model.response.ProfileResponse;
+import com.kjt.lms.model.response.user.ProfileResponse;
 import com.kjt.lms.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

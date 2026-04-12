@@ -9,6 +9,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -21,10 +23,12 @@ import java.util.UUID;
 @Table(name = "quiz_answers")
 public class QuizAnswerEntity extends BaseEntity {
 
-    @Column(nullable = false)
+    @Column(name = "attempt_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID attemptId;
 
-    @Column(nullable = false)
+    @Column(name = "question_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID questionId;
 
     @Column(columnDefinition = "TEXT")

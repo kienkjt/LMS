@@ -1,6 +1,5 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.course;
 
-import com.kjt.lms.common.constants.CourseStatusEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -8,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.kjt.lms.common.constants.CourseStatusEnum;
 
 @Data
 @Builder
@@ -17,6 +17,7 @@ public class CourseCreateResponseDto {
 
     private UUID id;
     private UUID instructorId;
+    private String instructorName;
     private String title;
     private CourseStatusEnum status;
     private LocalDateTime createdAt;

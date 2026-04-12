@@ -10,18 +10,21 @@ import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.LessonEntity;
 import com.kjt.lms.model.request.lesson.CreateLessonRequestDto;
 import com.kjt.lms.model.request.lesson.UpdateLessonRequestDto;
-import com.kjt.lms.model.response.LessonResponseDto;
+import com.kjt.lms.model.response.lesson.LessonResponseDto;
+import com.kjt.lms.model.response.media.MediaUploadResponse;
 import com.kjt.lms.repository.ChapterRepository;
 import com.kjt.lms.repository.CourseRepository;
 import com.kjt.lms.repository.LessonRepository;
 import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.LessonService;
+import com.kjt.lms.service.MediaStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +40,7 @@ public class LessonServiceImpl implements LessonService {
     private final UserRepository userRepository;
     private final LessonMapper lessonMapper;
     private final MessageProvider messageProvider;
+    private final MediaStorageService mediaStorageService;
 
     @Override
     @Transactional
@@ -128,6 +132,44 @@ public class LessonServiceImpl implements LessonService {
         updateAggregateFields(course, chapter);
 
         log.info("Lesson deleted: {} from chapter: {} in course: {}", lessonId, chapterId, courseId);
+    }
+
+    @Override
+    @Transactional
+    public LessonResponseDto uploadLessonVideo(UUID courseId, UUID chapterId, UUID lessonId, MultipartFile file) {
+        CourseEntity course = findActiveCourseById(courseId);
+        validateCourseOwnership(course);
+
+        ChapterEntity chapter = findActiveChapterById(chapterId);
+        validateChapterBelongsToCourse(courseId, chapter);
+
+        LessonEntity lesson = findActiveLessonById(lessonId);
+        validateLessonBelongsToChapterAndCourse(courseId, chapterId, lesson);
+
+        try {
+            MediaUploadResponse uploadResponse = mediaStorageService.uploadCourseVideo(file);
+
+            if (lesson.getVideoPublicId() != null && !lesson.getVideoPublicId().isEmpty()) {
+                mediaStorageService.deleteMedia(lesson.getVideoPublicId(), "video");
+            }
+
+            lesson.setVideoUrl(uploadResponse.getSecureUrl());
+            lesson.setVideoPublicId(uploadResponse.getPublicId());
+
+            if (uploadResponse.getDuration() != null) {
+                lesson.setDuration(uploadResponse.getDuration().intValue());
+            }
+
+            LessonEntity updatedLesson = lessonRepository.save(lesson);
+            updateAggregateFields(course, chapter);
+
+            log.info("Lesson video uploaded: {} in chapter: {} of course: {}", lessonId, chapterId, courseId);
+            return lessonMapper.toDto(updatedLesson);
+
+        } catch (Exception ex) {
+            log.error("Lesson video upload failed: {} - {}", lessonId, ex.getMessage());
+            throw new BusinessException(messageProvider.getMessage("media.lesson.video.upload.failed"));
+        }
     }
 
     private CourseEntity findActiveCourseById(UUID courseId) {

@@ -187,7 +187,7 @@ public class GlobalExceptionHandler {
 
         APIResponse<Object> response = APIResponse.error(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "An error occurred. Please try again later."
+                "Lỗi hệ thống. Vui lòng thử lại sau."
         );
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);

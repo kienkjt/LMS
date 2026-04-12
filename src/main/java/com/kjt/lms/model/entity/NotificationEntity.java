@@ -5,6 +5,8 @@ import com.kjt.lms.common.constants.NotificationTypeEnum;
 import com.kjt.lms.common.constants.NotificationTypeEnumConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -17,7 +19,8 @@ import java.util.UUID;
 @Table(name = "notifications")
 public class NotificationEntity extends BaseEntity {
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID userId;
 
     @Column(name = "type", nullable = false)

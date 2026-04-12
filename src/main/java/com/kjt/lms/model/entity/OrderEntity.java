@@ -7,6 +7,8 @@ import com.kjt.lms.common.constants.PaymentMethodEnum;
 import com.kjt.lms.common.constants.PaymentMethodEnumConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,7 +23,8 @@ import java.util.UUID;
 @Table(name = "orders")
 public class OrderEntity extends BaseEntity {
 
-    @Column(name = "student_id", nullable = false)
+    @Column(name = "student_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID studentId;
 
     @Column(name = "order_code", nullable = false, unique = true, length = 50)

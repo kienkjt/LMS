@@ -5,6 +5,8 @@ import com.kjt.lms.common.constants.CommonStatusEnum;
 import com.kjt.lms.common.constants.CommonStatusEnumConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -18,10 +20,12 @@ import java.util.UUID;
 @Table(name = "reviews")
 public class ReviewEntity extends BaseEntity {
 
-    @Column(name = "student_id", nullable = false)
+    @Column(name = "student_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID studentId;
 
-    @Column(name = "course_id", nullable = false)
+    @Column(name = "course_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID courseId;
 
     @Column(name = "rating", nullable = false)

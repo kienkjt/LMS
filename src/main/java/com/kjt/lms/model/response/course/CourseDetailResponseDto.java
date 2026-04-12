@@ -1,7 +1,8 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.course;
 
 import com.kjt.lms.common.constants.CourseLevelEnum;
 import com.kjt.lms.common.constants.CourseStatusEnum;
+import com.kjt.lms.model.response.chapter.ChapterResponseDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,16 +10,18 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CourseResponseDto {
+public class CourseDetailResponseDto {
 
     private UUID id;
     private UUID instructorId;
+    private String instructorName;
     private UUID categoryId;
     private String title;
     private String shortDescription;
@@ -38,10 +41,8 @@ public class CourseResponseDto {
     private String certificate;
     private String requirements;
     private String whatYouWillLearn;
-    private UUID reviewedBy;
     private String rejectReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private UUID createdById;
-    private UUID updatedById;
+    private List<ChapterResponseDto> chapters;
 }

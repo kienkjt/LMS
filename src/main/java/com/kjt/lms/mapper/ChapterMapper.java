@@ -3,7 +3,7 @@ package com.kjt.lms.mapper;
 import com.kjt.lms.model.entity.ChapterEntity;
 import com.kjt.lms.model.request.chapter.CreateChapterRequestDto;
 import com.kjt.lms.model.request.chapter.UpdateChapterRequestDto;
-import com.kjt.lms.model.response.ChapterResponseDto;
+import com.kjt.lms.model.response.chapter.ChapterResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;

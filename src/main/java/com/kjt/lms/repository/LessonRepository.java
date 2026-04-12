@@ -27,9 +27,19 @@ public interface LessonRepository extends JpaRepository<LessonEntity, UUID> {
 
     long countByChapterIdAndDeletedFalse(UUID chapterId);
 
-    @Query("SELECT COALESCE(SUM(l.duration), 0) FROM LessonEntity l WHERE l.courseId = :courseId AND l.deleted = false")
+    @Query("""
+    SELECT COALESCE(SUM(l.duration), 0)
+    FROM LessonEntity l
+    WHERE l.courseId = :courseId
+      AND l.deleted = false
+    """)
     Integer sumDurationByCourseId(@Param("courseId") UUID courseId);
 
-    @Query("SELECT COALESCE(SUM(l.duration), 0) FROM LessonEntity l WHERE l.chapterId = :chapterId AND l.deleted = false")
+    @Query("""
+    SELECT COALESCE(SUM(l.duration), 0)
+    FROM LessonEntity l
+    WHERE l.chapterId = :chapterId
+      AND l.deleted = false
+    """)
     Integer sumDurationByChapterId(@Param("chapterId") UUID chapterId);
 }

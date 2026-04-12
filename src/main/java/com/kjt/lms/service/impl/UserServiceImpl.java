@@ -7,10 +7,11 @@ import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.model.entity.UserEntity;
 import com.kjt.lms.model.request.profile.ChangePasswordRequest;
 import com.kjt.lms.model.request.profile.UpdateProfileRequest;
-import com.kjt.lms.model.response.ProfileResponse;
+import com.kjt.lms.model.response.user.ProfileResponse;
 import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -31,6 +32,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final MessageProvider messageProvider;
+    @Qualifier("avatarCloudinary")
     private final Cloudinary cloudinary;
 
     @Value("${app.profile.avatar.max-size-bytes:5242880}")

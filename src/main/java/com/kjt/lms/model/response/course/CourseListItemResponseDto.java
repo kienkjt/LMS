@@ -1,4 +1,4 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.course;
 
 import com.kjt.lms.common.constants.CourseLevelEnum;
 import com.kjt.lms.common.constants.CourseStatusEnum;
@@ -32,4 +32,5 @@ public class CourseListItemResponseDto {
     private Integer totalReviews;
     private String language;
     private LocalDateTime createdAt;
+    private String instructorName;
 }

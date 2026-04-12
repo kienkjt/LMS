@@ -14,6 +14,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -27,7 +29,8 @@ import java.util.UUID;
 @Table(name = "users")
 public class UserEntity extends BaseEntity {
 
-    @Column(name = "role_id", nullable = false)
+    @Column(name = "role_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID roleId;
 
     @Column(name = "email", nullable = false, unique = true, length = 150)

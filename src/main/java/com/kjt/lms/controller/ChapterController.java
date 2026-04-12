@@ -4,7 +4,7 @@ import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.model.request.chapter.CreateChapterRequestDto;
 import com.kjt.lms.model.request.chapter.UpdateChapterRequestDto;
-import com.kjt.lms.model.response.ChapterResponseDto;
+import com.kjt.lms.model.response.chapter.ChapterResponseDto;
 import com.kjt.lms.service.ChapterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

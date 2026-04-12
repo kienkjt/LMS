@@ -14,7 +14,7 @@ import com.kjt.lms.model.request.auth.RefreshTokenRequestDto;
 import com.kjt.lms.model.request.auth.RegistrationRequestDto;
 import com.kjt.lms.model.request.auth.ResetPasswordRequestDto;
 import com.kjt.lms.model.request.auth.VerifyOtpRequestDto;
-import com.kjt.lms.model.response.LoginResponseDto;
+import com.kjt.lms.model.response.auth.LoginResponseDto;
 import com.kjt.lms.repository.RoleRepository;
 import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.AuthService;

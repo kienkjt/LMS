@@ -3,6 +3,8 @@ package com.kjt.lms.model.entity;
 import com.kjt.lms.common.base.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -15,13 +17,16 @@ import java.util.UUID;
 @Table(name = "notes")
 public class NoteEntity extends BaseEntity {
 
-    @Column(name = "student_id", nullable = false)
+    @Column(name = "student_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID studentId;
 
-    @Column(name = "lesson_id", nullable = false)
+    @Column(name = "lesson_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID lessonId;
 
-    @Column(name = "course_id", nullable = false)
+    @Column(name = "course_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID courseId;
 
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")

@@ -19,8 +19,5 @@ public class UpdateCategoryRequestDto {
 
     @Size(max = 2000, message = "{validation.category.description.size}")
     private String description;
-
-    @Size(max = 500, message = "{validation.category.thumbnail.size}")
-    private String thumbnail;
 }
 
