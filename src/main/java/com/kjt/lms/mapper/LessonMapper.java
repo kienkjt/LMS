@@ -4,7 +4,7 @@ import com.kjt.lms.common.constants.YesNoEnum;
 import com.kjt.lms.model.entity.LessonEntity;
 import com.kjt.lms.model.request.lesson.CreateLessonRequestDto;
 import com.kjt.lms.model.request.lesson.UpdateLessonRequestDto;
-import com.kjt.lms.model.response.LessonResponseDto;
+import com.kjt.lms.model.response.lesson.LessonResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;

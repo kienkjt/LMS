@@ -3,6 +3,8 @@ package com.kjt.lms.model.entity;
 import com.kjt.lms.common.base.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -16,10 +18,12 @@ import java.util.UUID;
 @Table(name = "order_items")
 public class OrderItemEntity extends BaseEntity {
 
-    @Column(name = "order_id", nullable = false)
+    @Column(name = "order_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID orderId;
 
-    @Column(name = "course_id", nullable = false)
+    @Column(name = "course_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID courseId;
 
     @Column(name = "course_title", nullable = false, length = 200)
@@ -37,6 +41,7 @@ public class OrderItemEntity extends BaseEntity {
     @Column(name = "instructor_revenue", precision = 12, scale = 2)
     private BigDecimal instructorRevenue;
 
-    @Column(name = "instructor_id")
+    @Column(name = "instructor_id", length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID instructorId;
 }

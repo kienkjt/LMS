@@ -5,12 +5,12 @@ import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.LessonEntity;
 import com.kjt.lms.model.request.course.CreateCourseRequestDto;
 import com.kjt.lms.model.request.course.UpdateCourseRequestDto;
-import com.kjt.lms.model.response.ChapterResponseDto;
-import com.kjt.lms.model.response.CourseCreateResponseDto;
-import com.kjt.lms.model.response.CourseDetailResponseDto;
-import com.kjt.lms.model.response.CourseListItemResponseDto;
-import com.kjt.lms.model.response.CourseResponseDto;
-import com.kjt.lms.model.response.LessonResponseDto;
+import com.kjt.lms.model.response.chapter.ChapterResponseDto;
+import com.kjt.lms.model.response.course.CourseCreateResponseDto;
+import com.kjt.lms.model.response.course.CourseDetailResponseDto;
+import com.kjt.lms.model.response.course.CourseListItemResponseDto;
+import com.kjt.lms.model.response.course.CourseUpdateResponseDto;
+import com.kjt.lms.model.response.lesson.LessonResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -24,7 +24,7 @@ public interface CourseMapper {
     @Mapping(source = "updatedAt", target = "updatedAt")
     @Mapping(source = "createdById", target = "createdById")
     @Mapping(source = "updatedById", target = "updatedById")
-    CourseResponseDto toDto(CourseEntity entity);
+    CourseUpdateResponseDto toDto(CourseEntity entity);
 
     CourseCreateResponseDto toCreateResponse(CourseEntity entity);
 

@@ -1,4 +1,4 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.lesson;
 
 import com.kjt.lms.common.constants.LessonTypeEnum;
 import lombok.AllArgsConstructor;

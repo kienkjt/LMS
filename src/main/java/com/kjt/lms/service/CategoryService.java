@@ -2,7 +2,7 @@ package com.kjt.lms.service;
 
 import com.kjt.lms.model.request.category.CreateCategoryRequestDto;
 import com.kjt.lms.model.request.category.UpdateCategoryRequestDto;
-import com.kjt.lms.model.response.CategoryResponseDto;
+import com.kjt.lms.model.response.category.CategoryResponseDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

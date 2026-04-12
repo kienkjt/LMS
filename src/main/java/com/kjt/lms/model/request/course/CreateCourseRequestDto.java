@@ -27,19 +27,11 @@ public class CreateCourseRequestDto {
     @Size(max = 5000, message = "{validation.fullDescription.size}")
     private String fullDescription;
 
-    @Size(max = 500, message = "{validation.thumbnail.size}")
-    private String thumbnail;
-
-    @Size(max = 500, message = "{validation.previewVideoUrl.size}")
-    private String previewVideoUrl;
-
     @NotNull(message = "{validation.price.notNull}")
     @DecimalMin(value = "0.0", message = "{validation.price.min}")
-    @DecimalMax(value = "99999999", message = "{validation.price.max}")
     private BigDecimal price;
 
     @DecimalMin(value = "0.0", message = "{validation.discountPrice.min}")
-    @DecimalMax(value = "999999.99", message = "{validation.discountPrice.max}")
     private BigDecimal discountPrice;
 
     @NotNull(message = "{validation.level.notNull}")

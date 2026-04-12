@@ -4,7 +4,7 @@ import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.model.request.lesson.CreateLessonRequestDto;
 import com.kjt.lms.model.request.lesson.UpdateLessonRequestDto;
-import com.kjt.lms.model.response.LessonResponseDto;
+import com.kjt.lms.model.response.lesson.LessonResponseDto;
 import com.kjt.lms.service.LessonService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -86,5 +88,17 @@ public class LessonController {
             @PathVariable UUID lessonId) {
         lessonService.deleteLesson(courseId, chapterId, lessonId);
         return ResponseEntity.ok(APIResponse.success(null, messageProvider.getMessage("lesson.deleted.success")));
+    }
+
+    @PostMapping("/{lessonId}/video")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Upload lesson video", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<LessonResponseDto>> uploadLessonVideo(
+            @PathVariable UUID courseId,
+            @PathVariable UUID chapterId,
+            @PathVariable UUID lessonId,
+            @RequestParam("file") MultipartFile file) {
+        LessonResponseDto response = lessonService.uploadLessonVideo(courseId, chapterId, lessonId, file);
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("lesson.video.upload.success")));
     }
 }

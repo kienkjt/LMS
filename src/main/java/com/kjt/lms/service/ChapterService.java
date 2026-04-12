@@ -2,7 +2,7 @@ package com.kjt.lms.service;
 
 import com.kjt.lms.model.request.chapter.CreateChapterRequestDto;
 import com.kjt.lms.model.request.chapter.UpdateChapterRequestDto;
-import com.kjt.lms.model.response.ChapterResponseDto;
+import com.kjt.lms.model.response.chapter.ChapterResponseDto;
 
 import java.util.List;
 import java.util.UUID;

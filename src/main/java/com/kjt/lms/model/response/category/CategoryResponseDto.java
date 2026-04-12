@@ -1,4 +1,4 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.category;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,12 +13,9 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CategoryResponseDto {
-
     private UUID id;
     private String name;
     private String description;
-    private String thumbnail;
-    private UUID courseId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private UUID createdById;

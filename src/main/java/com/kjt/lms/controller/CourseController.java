@@ -7,10 +7,10 @@ import com.kjt.lms.model.request.course.CreateCourseRequestDto;
 import com.kjt.lms.model.request.course.RejectCourseRequest;
 import com.kjt.lms.model.request.course.SearchCourseRequest;
 import com.kjt.lms.model.request.course.UpdateCourseRequestDto;
-import com.kjt.lms.model.response.CourseCreateResponseDto;
-import com.kjt.lms.model.response.CourseDetailResponseDto;
-import com.kjt.lms.model.response.CourseListItemResponseDto;
-import com.kjt.lms.model.response.CourseResponseDto;
+import com.kjt.lms.model.response.course.CourseCreateResponseDto;
+import com.kjt.lms.model.response.course.CourseDetailResponseDto;
+import com.kjt.lms.model.response.course.CourseListItemResponseDto;
+import com.kjt.lms.model.response.course.CourseUpdateResponseDto;
 import com.kjt.lms.service.CourseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -25,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
@@ -50,10 +51,10 @@ public class CourseController {
     @PutMapping("/{courseId}")
     @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
     @Operation(summary = "Update course", security = @SecurityRequirement(name = "Bearer"))
-    public ResponseEntity<APIResponse<CourseResponseDto>> updateCourse(
+    public ResponseEntity<APIResponse<CourseUpdateResponseDto>> updateCourse(
             @PathVariable UUID courseId,
             @Valid @RequestBody UpdateCourseRequestDto request) {
-        CourseResponseDto response = courseService.updateCourse(courseId, request);
+        CourseUpdateResponseDto response = courseService.updateCourse(courseId, request);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.updated.success")));
     }
 
@@ -79,7 +80,7 @@ public class CourseController {
     @Operation(summary = "Get all published courses (default search)")
     public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> getPublishedCourses(
             @RequestParam(required = false) String keyword,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable) {
         pageable = PageableValidator.validate(pageable);
         SearchCourseRequest request = SearchCourseRequest.builder()
                 .keyword(keyword)
@@ -120,18 +121,18 @@ public class CourseController {
     @PostMapping("/{courseId}/publish")
     @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
     @Operation(summary = "Publish course", security = @SecurityRequirement(name = "Bearer"))
-    public ResponseEntity<APIResponse<CourseResponseDto>> publishCourse(
+    public ResponseEntity<APIResponse<CourseUpdateResponseDto>> publishCourse(
             @PathVariable UUID courseId) {
-        CourseResponseDto response = courseService.publishCourse(courseId);
+        CourseUpdateResponseDto response = courseService.publishCourse(courseId);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.published.success")));
     }
 
     @PostMapping("/{courseId}/unpublish")
     @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
     @Operation(summary = "Unpublish course", security = @SecurityRequirement(name = "Bearer"))
-    public ResponseEntity<APIResponse<CourseResponseDto>> unpublishCourse(
+    public ResponseEntity<APIResponse<CourseUpdateResponseDto>> unpublishCourse(
             @PathVariable UUID courseId) {
-        CourseResponseDto response = courseService.unpublishCourse(courseId);
+        CourseUpdateResponseDto response = courseService.unpublishCourse(courseId);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.unpublished.success")));
     }
 
@@ -159,19 +160,40 @@ public class CourseController {
     @PostMapping("/{courseId}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Approve course (Admin only)", security = @SecurityRequirement(name = "Bearer"))
-    public ResponseEntity<APIResponse<CourseResponseDto>> approveCourse(
+    public ResponseEntity<APIResponse<CourseUpdateResponseDto>> approveCourse(
             @PathVariable UUID courseId) {
-        CourseResponseDto response = courseService.approveCourse(courseId);
+        CourseUpdateResponseDto response = courseService.approveCourse(courseId);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.approved.success")));
     }
 
     @PostMapping("/{courseId}/reject")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Reject course with reason (Admin only)", security = @SecurityRequirement(name = "Bearer"))
-    public ResponseEntity<APIResponse<CourseResponseDto>> rejectCourse(
+    public ResponseEntity<APIResponse<CourseUpdateResponseDto>> rejectCourse(
             @PathVariable UUID courseId,
             @Valid @RequestBody RejectCourseRequest request) {
-        CourseResponseDto response = courseService.rejectCourse(courseId, request.getReason());
+        CourseUpdateResponseDto response = courseService.rejectCourse(courseId, request.getReason());
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.rejected.success")));
+    }
+
+
+    @PostMapping("/{courseId}/image")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Upload course thumbnail image", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<CourseUpdateResponseDto>> uploadCourseImage(
+            @PathVariable UUID courseId,
+            @RequestParam("file") MultipartFile file) {
+        CourseUpdateResponseDto response = courseService.uploadCourseImage(courseId, file);
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.image.upload.success")));
+    }
+
+    @PostMapping("/{courseId}/preview-video")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Upload course preview video", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<CourseUpdateResponseDto>> uploadCoursePreviewVideo(
+            @PathVariable("courseId") UUID courseId,
+            @RequestParam("file") MultipartFile file) {
+        CourseUpdateResponseDto response = courseService.uploadCoursePreviewVideo(courseId, file);
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.preview.video.upload.success")));
     }
 }

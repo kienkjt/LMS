@@ -22,7 +22,15 @@ public interface CategoryRepository extends JpaRepository<CategoryEntity, UUID> 
 
     Page<CategoryEntity> findByDeletedFalse(Pageable pageable);
 
-    @Query("SELECT c FROM CategoryEntity c WHERE c.deleted = false AND (LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(COALESCE(c.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    @Query("""
+    SELECT c
+    FROM CategoryEntity c
+    WHERE c.deleted = false
+      AND (
+            LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+      )
+    order by c.id desc
+    """)
     Page<CategoryEntity> search(@Param("keyword") String keyword, Pageable pageable);
 }
 

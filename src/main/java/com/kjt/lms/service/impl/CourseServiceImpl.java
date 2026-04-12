@@ -13,18 +13,20 @@ import com.kjt.lms.model.entity.LessonEntity;
 import com.kjt.lms.model.request.course.CreateCourseRequestDto;
 import com.kjt.lms.model.request.course.SearchCourseRequest;
 import com.kjt.lms.model.request.course.UpdateCourseRequestDto;
-import com.kjt.lms.model.response.ChapterResponseDto;
-import com.kjt.lms.model.response.CourseCreateResponseDto;
-import com.kjt.lms.model.response.CourseDetailResponseDto;
-import com.kjt.lms.model.response.CourseListItemResponseDto;
-import com.kjt.lms.model.response.CourseResponseDto;
-import com.kjt.lms.model.response.LessonResponseDto;
+import com.kjt.lms.model.response.chapter.ChapterResponseDto;
+import com.kjt.lms.model.response.course.CourseCreateResponseDto;
+import com.kjt.lms.model.response.course.CourseDetailResponseDto;
+import com.kjt.lms.model.response.course.CourseListItemResponseDto;
+import com.kjt.lms.model.response.course.CourseUpdateResponseDto;
+import com.kjt.lms.model.response.lesson.LessonResponseDto;
+import com.kjt.lms.model.response.media.MediaUploadResponse;
 import com.kjt.lms.repository.CategoryRepository;
 import com.kjt.lms.repository.ChapterRepository;
 import com.kjt.lms.repository.CourseRepository;
 import com.kjt.lms.repository.LessonRepository;
 import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.CourseService;
+import com.kjt.lms.service.MediaStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,6 +34,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 import java.util.List;
@@ -51,6 +54,7 @@ public class CourseServiceImpl implements CourseService {
     private final LessonRepository lessonRepository;
     private final CourseMapper courseMapper;
     private final MessageProvider messageProvider;
+    private final MediaStorageService mediaStorageService;
 
     @Override
     @Transactional
@@ -61,12 +65,13 @@ public class CourseServiceImpl implements CourseService {
         CourseEntity savedCourse = courseRepository.save(courseMapper.toCreateEntity(request, instructorId));
 
         log.info("Course created: {} by instructor: {}", savedCourse.getId(), instructorId);
-        return courseMapper.toCreateResponse(savedCourse);
+        return courseRepository.findCreateResponseById(savedCourse.getId())
+                .orElseGet(() -> courseMapper.toCreateResponse(savedCourse));
     }
 
     @Override
     @Transactional
-    public CourseResponseDto updateCourse(UUID courseId, UpdateCourseRequestDto request) {
+    public CourseUpdateResponseDto updateCourse(UUID courseId, UpdateCourseRequestDto request) {
         CourseEntity course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
@@ -88,27 +93,28 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        return buildCourseDetailResponse(course);
+        CourseDetailResponseDto detailResponse = buildCourseDetailResponse(course);
+        courseRepository.findInstructorNameByCourseId(courseId).ifPresent(detailResponse::setInstructorName);
+        return detailResponse;
     }
 
     @Override
     public Page<CourseListItemResponseDto> getInstructorCourses(Pageable pageable) {
         UUID instructorId = getCurrentUserId();
-        return courseRepository.findByInstructorId(instructorId, pageable)
-                .map(courseMapper::toListItemDto);
+        return courseRepository.findInstructorCoursesWithInstructorName(instructorId, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<CourseListItemResponseDto> searchCourses(SearchCourseRequest request, Pageable pageable) {
 
-        Page<CourseListItemResponseDto> results = courseRepository.search(
+        Page<CourseListItemResponseDto> results = courseRepository.searchWithInstructorName(
                 request.getKeyword(),
                 request.getCourseStatus(),
                 request.getCourseLevel(),
                 request.getActive(),
                 pageable
-        ).map(courseMapper::toListItemDto);
+        );
 
         if (results.hasContent()) {
             log.info("Search completed - found {} courses", results.getTotalElements());
@@ -127,42 +133,41 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                     messageProvider.getMessage("exception.category.notFound")));
 
-        // Always filter PUBLISHED + ACTIVE (security enforcement)
-        return courseRepository.findCoursesByCategory(
+        return courseRepository.findCoursesByCategoryWithInstructorName(
                 categoryId,
                 CourseStatusEnum.PUBLISHED,
                 CommonStatusEnum.ACTIVE,
                 pageable
-        ).map(courseMapper::toListItemDto);
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<CourseListItemResponseDto> getTopRatedCourses(Pageable pageable) {
-        return courseRepository.search(
+        return courseRepository.searchWithInstructorName(
                 null,
                 CourseStatusEnum.PUBLISHED,
                 null,
                 CommonStatusEnum.ACTIVE,
                 pageable
-        ).map(courseMapper::toListItemDto);
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<CourseListItemResponseDto> getTrendingCourses(Pageable pageable) {
-        return courseRepository.search(
+        return courseRepository.searchWithInstructorName(
                 null,
                 CourseStatusEnum.PUBLISHED,
                 null,
                 CommonStatusEnum.ACTIVE,
                 pageable
-        ).map(courseMapper::toListItemDto);
+        );
     }
 
     @Override
     @Transactional
-    public CourseResponseDto publishCourse(UUID courseId) {
+    public CourseUpdateResponseDto publishCourse(UUID courseId) {
         CourseEntity course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
@@ -193,7 +198,7 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional
-    public CourseResponseDto unpublishCourse(UUID courseId) {
+    public CourseUpdateResponseDto unpublishCourse(UUID courseId) {
         CourseEntity course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
@@ -234,7 +239,7 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional
-    public CourseResponseDto approveCourse(UUID courseId) {
+    public CourseUpdateResponseDto approveCourse(UUID courseId) {
         CourseEntity course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
@@ -254,7 +259,7 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional
-    public CourseResponseDto rejectCourse(UUID courseId, String reason) {
+    public CourseUpdateResponseDto rejectCourse(UUID courseId, String reason) {
         CourseEntity course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
@@ -266,6 +271,70 @@ public class CourseServiceImpl implements CourseService {
         log.info("Course rejected: {} with reason: {}", courseId, reason);
 
         return courseMapper.toDto(updatedCourse);
+    }
+
+    @Override
+    @Transactional
+    public CourseUpdateResponseDto uploadCourseImage(UUID courseId, MultipartFile file) {
+        CourseEntity course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.course.notFound")));
+
+        UUID instructorId = getCurrentUserId();
+        validateCourseOwnership(course, instructorId);
+
+        try {
+            MediaUploadResponse uploadResponse = mediaStorageService.uploadCourseImage(file);
+
+            if (course.getThumbnail() != null && !course.getThumbnail().isEmpty()) {
+                String oldPublicId = extractPublicIdFromUrl(course.getThumbnail());
+                if (oldPublicId != null) {
+                    mediaStorageService.deleteMedia(oldPublicId, "image");
+                }
+            }
+
+            course.setThumbnail(uploadResponse.getSecureUrl());
+            CourseEntity updatedCourse = courseRepository.save(course);
+
+            log.info("Course image uploaded: {} by instructor: {}", courseId, instructorId);
+            return courseMapper.toDto(updatedCourse);
+
+        } catch (Exception ex) {
+            log.error("Course image upload failed: {} - {}", courseId, ex.getMessage());
+            throw new BusinessException(messageProvider.getMessage("media.course.image.upload.failed"));
+        }
+    }
+
+    @Override
+    @Transactional
+    public CourseUpdateResponseDto uploadCoursePreviewVideo(UUID courseId, MultipartFile file) {
+        CourseEntity course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.course.notFound")));
+
+        UUID instructorId = getCurrentUserId();
+        validateCourseOwnership(course, instructorId);
+
+        try {
+            MediaUploadResponse uploadResponse = mediaStorageService.uploadCourseVideo(file);
+
+            if (course.getPreviewVideoUrl() != null && !course.getPreviewVideoUrl().isEmpty()) {
+                String oldPublicId = extractPublicIdFromUrl(course.getPreviewVideoUrl());
+                if (oldPublicId != null) {
+                    mediaStorageService.deleteMedia(oldPublicId, "video");
+                }
+            }
+
+            course.setPreviewVideoUrl(uploadResponse.getSecureUrl());
+            CourseEntity updatedCourse = courseRepository.save(course);
+
+            log.info("Course preview video uploaded: {} by instructor: {}", courseId, instructorId);
+            return courseMapper.toDto(updatedCourse);
+
+        } catch (Exception ex) {
+            log.error("FULL ERROR upload video", ex);
+            throw ex;
+        }
     }
 
     private CourseDetailResponseDto buildCourseDetailResponse(CourseEntity course) {
@@ -319,5 +388,29 @@ public class CourseServiceImpl implements CourseService {
 
     private boolean isPublishableStatus(CourseStatusEnum status) {
         return status == CourseStatusEnum.DRAFT || status == CourseStatusEnum.REJECTED;
+    }
+
+    private String extractPublicIdFromUrl(String cloudinaryUrl) {
+        if (cloudinaryUrl == null || cloudinaryUrl.isEmpty()) {
+            return null;
+        }
+        try {
+            String[] parts = cloudinaryUrl.split("/");
+            if (parts.length > 0) {
+                String lastPart = parts[parts.length - 1];
+                int dotIndex = lastPart.lastIndexOf(".");
+                if (dotIndex > 0) {
+                    lastPart = lastPart.substring(0, dotIndex);
+                }
+                if (cloudinaryUrl.contains("lms/courses/")) {
+                    int folderIndex = cloudinaryUrl.indexOf("lms/courses/");
+                    String folderPath = cloudinaryUrl.substring(folderIndex);
+                    return folderPath.substring(0, folderPath.lastIndexOf("."));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not extract public ID from URL: {}", cloudinaryUrl);
+        }
+        return null;
     }
 }

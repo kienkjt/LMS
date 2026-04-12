@@ -4,7 +4,7 @@ import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.model.request.category.CreateCategoryRequestDto;
 import com.kjt.lms.model.request.category.UpdateCategoryRequestDto;
-import com.kjt.lms.model.response.CategoryResponseDto;
+import com.kjt.lms.model.response.category.CategoryResponseDto;
 import com.kjt.lms.service.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

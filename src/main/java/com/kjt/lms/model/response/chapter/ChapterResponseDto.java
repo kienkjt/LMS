@@ -1,5 +1,6 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.chapter;
 
+import com.kjt.lms.model.response.lesson.LessonResponseDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

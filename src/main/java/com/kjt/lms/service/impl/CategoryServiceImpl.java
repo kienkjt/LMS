@@ -7,7 +7,7 @@ import com.kjt.lms.mapper.CategoryMapper;
 import com.kjt.lms.model.entity.CategoryEntity;
 import com.kjt.lms.model.request.category.CreateCategoryRequestDto;
 import com.kjt.lms.model.request.category.UpdateCategoryRequestDto;
-import com.kjt.lms.model.response.CategoryResponseDto;
+import com.kjt.lms.model.response.category.CategoryResponseDto;
 import com.kjt.lms.repository.CategoryRepository;
 import com.kjt.lms.repository.CourseRepository;
 import com.kjt.lms.service.CategoryService;

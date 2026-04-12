@@ -1,4 +1,4 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.user;
 
 import com.kjt.lms.common.constants.GenderEnum;
 import lombok.AllArgsConstructor;
@@ -19,3 +19,4 @@ public class ProfileResponse {
     private String phoneNumber;
     private String avatar;
 }
+

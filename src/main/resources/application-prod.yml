@@ -8,15 +8,34 @@ spring:
     hibernate:
       ddl-auto: validate
 
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:1024MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:1024MB}
+
   messages:
     basename: i18n/messages
     encoding: UTF-8
     fallback-to-system-locale: true
 
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME}
-  api-key: ${CLOUDINARY_API_KEY}
-  api-secret: ${CLOUDINARY_API_SECRET}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:${CLOUDINARY_AVATAR_CLOUD_NAME:}}
+  api-key: ${CLOUDINARY_API_KEY:${CLOUDINARY_AVATAR_API_KEY:}}
+  api-secret: ${CLOUDINARY_API_SECRET:${CLOUDINARY_AVATAR_API_SECRET:}}
+
+  accounts:
+    avatar:
+      cloud-name: ${CLOUDINARY_AVATAR_CLOUD_NAME:${CLOUDINARY_CLOUD_NAME:}}
+      api-key: ${CLOUDINARY_AVATAR_API_KEY:${CLOUDINARY_API_KEY:}}
+      api-secret: ${CLOUDINARY_AVATAR_API_SECRET:${CLOUDINARY_API_SECRET:}}
+    course-image:
+      cloud-name: ${CLOUDINARY_COURSE_IMAGE_CLOUD_NAME:${CLOUDINARY_AVATAR_CLOUD_NAME:${CLOUDINARY_CLOUD_NAME:}}}
+      api-key: ${CLOUDINARY_COURSE_IMAGE_API_KEY:${CLOUDINARY_AVATAR_API_KEY:${CLOUDINARY_API_KEY:}}}
+      api-secret: ${CLOUDINARY_COURSE_IMAGE_API_SECRET:${CLOUDINARY_AVATAR_API_SECRET:${CLOUDINARY_API_SECRET:}}}
+    course-video:
+      cloud-name: ${CLOUDINARY_COURSE_VIDEO_CLOUD_NAME:${CLOUDINARY_AVATAR_CLOUD_NAME:${CLOUDINARY_CLOUD_NAME:}}}
+      api-key: ${CLOUDINARY_COURSE_VIDEO_API_KEY:${CLOUDINARY_AVATAR_API_KEY:${CLOUDINARY_API_KEY:}}}
+      api-secret: ${CLOUDINARY_COURSE_VIDEO_API_SECRET:${CLOUDINARY_AVATAR_API_SECRET:${CLOUDINARY_API_SECRET:}}}
 
 otp:
   expiration-minutes: 5
@@ -29,3 +48,10 @@ app:
     avatar:
       max-size-bytes: ${AVATAR_MAX_SIZE_BYTES:5242880}
       allowed-content-types: ${AVATAR_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
+  media:
+    course-image:
+      max-size-bytes: ${MEDIA_COURSE_IMAGE_MAX_SIZE_BYTES:52428800}
+      allowed-content-types: ${MEDIA_COURSE_IMAGE_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
+    course-video:
+      max-size-bytes: ${MEDIA_COURSE_VIDEO_MAX_SIZE_BYTES:5368709120}
+      allowed-content-types: ${MEDIA_COURSE_VIDEO_ALLOWED_CONTENT_TYPES:video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/x-flv,video/webm}

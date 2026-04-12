@@ -1,4 +1,4 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.auth;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,3 +18,4 @@ public class LoginResponseDto {
     private String role;
     private String message;
 }
+

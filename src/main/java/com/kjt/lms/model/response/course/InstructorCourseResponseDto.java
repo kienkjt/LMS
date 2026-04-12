@@ -1,7 +1,8 @@
-package com.kjt.lms.model.response;
+package com.kjt.lms.model.response.course;
 
 import com.kjt.lms.common.constants.CourseLevelEnum;
 import com.kjt.lms.common.constants.CourseStatusEnum;
+import com.kjt.lms.model.response.chapter.ChapterResponseDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,14 +13,17 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Response DTO cho instructor xem khóa học của mình
+ * Dùng khi instructor view course với các stats bổ sung
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CourseDetailResponseDto {
+public class InstructorCourseResponseDto {
 
     private UUID id;
-    private UUID instructorId;
     private UUID categoryId;
     private String title;
     private String shortDescription;
@@ -39,8 +43,13 @@ public class CourseDetailResponseDto {
     private String certificate;
     private String requirements;
     private String whatYouWillLearn;
-    private String rejectReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<ChapterResponseDto> chapters;
+
+    // Instructor-specific stats
+    private Double totalEarnings;
+    private Integer enrollmentStatus;
+    private Long totalLessonViews;
 }
+

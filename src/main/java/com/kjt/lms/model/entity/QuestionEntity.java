@@ -5,6 +5,8 @@ import com.kjt.lms.common.constants.QuizTypeEnum;
 import com.kjt.lms.common.constants.QuizTypeEnumConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -17,7 +19,8 @@ import java.util.UUID;
 @Table(name = "questions")
 public class QuestionEntity extends BaseEntity {
 
-    @Column(nullable = false)
+    @Column(name = "quiz_id", nullable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID quizId;
 
     @Column(nullable = false, columnDefinition = "TEXT")
