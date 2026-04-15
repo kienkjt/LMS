@@ -2,6 +2,7 @@ package com.kjt.lms.controller;
 
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
+import com.kjt.lms.common.validator.Common;
 import com.kjt.lms.model.request.category.CreateCategoryRequestDto;
 import com.kjt.lms.model.request.category.UpdateCategoryRequestDto;
 import com.kjt.lms.model.response.category.CategoryResponseDto;
@@ -12,13 +13,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,7 +60,9 @@ public class CategoryController {
     @Operation(summary = "Get categories")
     public ResponseEntity<APIResponse<Page<CategoryResponseDto>>> getCategories(
             @RequestParam(required = false) String keyword,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
         Page<CategoryResponseDto> response = categoryService.getCategories(keyword, pageable);
         return ResponseEntity.ok(APIResponse.success(response, null));
     }

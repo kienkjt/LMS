@@ -2,7 +2,7 @@ package com.kjt.lms.controller;
 
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.common.i18n.MessageProvider;
-import com.kjt.lms.common.validator.PageableValidator;
+import com.kjt.lms.common.validator.Common;
 import com.kjt.lms.model.request.course.CreateCourseRequestDto;
 import com.kjt.lms.model.request.course.RejectCourseRequest;
 import com.kjt.lms.model.request.course.SearchCourseRequest;
@@ -18,9 +18,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -70,8 +69,9 @@ public class CourseController {
     @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
     @Operation(summary = "Get my courses", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> getMyInstructorCourses(
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        pageable = PageableValidator.validate(pageable);
+            @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
         Page<CourseListItemResponseDto> response = courseService.getInstructorCourses(pageable);
         return ResponseEntity.ok(APIResponse.success(response, null));
     }
@@ -80,8 +80,9 @@ public class CourseController {
     @Operation(summary = "Get all published courses (default search)")
     public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> getPublishedCourses(
             @RequestParam(required = false) String keyword,
-            @PageableDefault(size = 20, sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        pageable = PageableValidator.validate(pageable);
+            @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
         SearchCourseRequest request = SearchCourseRequest.builder()
                 .keyword(keyword)
                 .build();
@@ -93,8 +94,9 @@ public class CourseController {
     @Operation(summary = "Get courses by category (published & active only)")
     public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> getCoursesByCategory(
             @PathVariable UUID categoryId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        pageable = PageableValidator.validate(pageable);
+            @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
         Page<CourseListItemResponseDto> response = courseService.getCoursesByCategory(categoryId, pageable);
         return ResponseEntity.ok(APIResponse.success(response, null));
     }
@@ -103,8 +105,9 @@ public class CourseController {
     @GetMapping("/trending")
     @Operation(summary = "Get trending courses")
     public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> getTrendingCourses(
-            @PageableDefault(size = 20, sort = "totalStudents", direction = Sort.Direction.DESC) Pageable pageable) {
-        pageable = PageableValidator.validate(pageable);
+            @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
         Page<CourseListItemResponseDto> response = courseService.getTrendingCourses(pageable);
         return ResponseEntity.ok(APIResponse.success(response, null));
     }
@@ -112,8 +115,9 @@ public class CourseController {
     @GetMapping("/top-rated")
     @Operation(summary = "Get top rated courses")
     public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> getTopRatedCourses(
-            @PageableDefault(size = 20, sort = "avgRating", direction = Sort.Direction.DESC) Pageable pageable) {
-        pageable = PageableValidator.validate(pageable);
+            @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
         Page<CourseListItemResponseDto> response = courseService.getTopRatedCourses(pageable);
         return ResponseEntity.ok(APIResponse.success(response, null));
     }
@@ -149,10 +153,9 @@ public class CourseController {
     @Operation(summary = "Advanced search courses with filters (keyword, status, level, active)")
     public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> advancedSearch(
             @RequestBody(required = false) SearchCourseRequest request,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-
-        pageable = PageableValidator.validate(pageable);
-
+            @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
         Page<CourseListItemResponseDto> response = courseService.searchCourses(request, pageable);
         return ResponseEntity.ok(APIResponse.success(response, null));
     }
