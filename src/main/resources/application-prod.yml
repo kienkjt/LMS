@@ -18,6 +18,14 @@ spring:
     encoding: UTF-8
     fallback-to-system-locale: true
 
+server:
+  port: ${SERVER_PORT:8080}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: ${JWT_EXPIRATION:86400000}
+  refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
+
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:${CLOUDINARY_AVATAR_CLOUD_NAME:}}
   api-key: ${CLOUDINARY_API_KEY:${CLOUDINARY_AVATAR_API_KEY:}}
