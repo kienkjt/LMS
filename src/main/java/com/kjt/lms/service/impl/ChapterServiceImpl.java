@@ -1,6 +1,7 @@
 package com.kjt.lms.service.impl;
 
-import com.kjt.lms.common.base.BaseEntity;
+import com.kjt.lms.common.base.BaseService;
+import com.kjt.lms.common.constants.YesNoEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
@@ -14,17 +15,15 @@ import com.kjt.lms.model.request.chapter.UpdateChapterRequestDto;
 import com.kjt.lms.model.response.chapter.ChapterResponseDto;
 import com.kjt.lms.model.response.lesson.LessonResponseDto;
 import com.kjt.lms.repository.ChapterRepository;
-import com.kjt.lms.repository.CourseRepository;
+import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonRepository;
-import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.ChapterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -34,12 +33,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ChapterServiceImpl implements ChapterService {
+public class ChapterServiceImpl extends BaseService implements ChapterService {
 
     private final ChapterRepository chapterRepository;
     private final LessonRepository lessonRepository;
-    private final CourseRepository courseRepository;
-    private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final ChapterMapper chapterMapper;
     private final LessonMapper lessonMapper;
     private final MessageProvider messageProvider;
@@ -55,7 +53,6 @@ public class ChapterServiceImpl implements ChapterService {
         }
 
         ChapterEntity savedChapter = chapterRepository.save(chapterMapper.toCreateEntity(request, courseId));
-
         log.info("Chapter created: {} for course: {}", savedChapter.getId(), courseId);
 
         ChapterResponseDto response = chapterMapper.toDto(savedChapter);
@@ -66,19 +63,20 @@ public class ChapterServiceImpl implements ChapterService {
     @Override
     @Transactional(readOnly = true)
     public ChapterResponseDto getChapterById(UUID courseId, UUID chapterId) {
-        findActiveCourseById(courseId);
+        CourseEntity course = findActiveCourseById(courseId);
         ChapterEntity chapter = findActiveChapterById(chapterId);
         validateChapterBelongsToCourse(courseId, chapter);
 
         ChapterResponseDto response = chapterMapper.toDto(chapter);
-        response.setLessons(getLessonDtos(courseId, chapterId));
+        response.setLessons(getLessonDtos(course, chapterId));
         return response;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ChapterResponseDto> getChaptersByCourse(UUID courseId) {
-        findActiveCourseById(courseId);
+        CourseEntity course = findActiveCourseById(courseId);
+        boolean canViewFullContent = canUserViewFullContent(course);
 
         List<ChapterEntity> chapters = chapterRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(courseId);
         Map<UUID, List<LessonResponseDto>> lessonsByChapter = lessonRepository
@@ -86,7 +84,11 @@ public class ChapterServiceImpl implements ChapterService {
                 .stream()
                 .collect(Collectors.groupingBy(
                         LessonEntity::getChapterId,
-                        Collectors.mapping(lessonMapper::toDto, Collectors.toList())
+                        Collectors.mapping(lesson -> {
+                            LessonResponseDto dto = lessonMapper.toDto(lesson);
+                            maskPaidContentIfNeeded(lesson, dto, canViewFullContent);
+                            return dto;
+                        }, Collectors.toList())
                 ));
 
         return chapters.stream()
@@ -117,7 +119,7 @@ public class ChapterServiceImpl implements ChapterService {
         log.info("Chapter updated: {}", chapterId);
 
         ChapterResponseDto response = chapterMapper.toDto(updatedChapter);
-        response.setLessons(getLessonDtos(courseId, chapterId));
+        response.setLessons(getLessonDtos(course, chapterId));
         return response;
     }
 
@@ -144,23 +146,56 @@ public class ChapterServiceImpl implements ChapterService {
         log.info("Chapter deleted: {} in course: {}", chapterId, courseId);
     }
 
-    private List<LessonResponseDto> getLessonDtos(UUID courseId, UUID chapterId) {
-        return lessonRepository.findByCourseIdAndChapterIdAndDeletedFalseOrderByCreatedAtAsc(courseId, chapterId)
+    private List<LessonResponseDto> getLessonDtos(CourseEntity course, UUID chapterId) {
+        boolean canViewFullContent = canUserViewFullContent(course);
+
+        return lessonRepository.findByCourseIdAndChapterIdAndDeletedFalseOrderByCreatedAtAsc(course.getId(), chapterId)
                 .stream()
-                .map(lessonMapper::toDto)
+                .map(lesson -> {
+                    LessonResponseDto dto = lessonMapper.toDto(lesson);
+                    maskPaidContentIfNeeded(lesson, dto, canViewFullContent);
+                    return dto;
+                })
                 .toList();
     }
 
-    private CourseEntity findActiveCourseById(UUID courseId) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
-
-        if (Boolean.TRUE.equals(course.getDeleted())) {
-            throw new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound"));
+    private boolean canUserViewFullContent(CourseEntity course) {
+        if (isFreeCourse(course)) {
+            return true;
         }
 
-        return course;
+        if (securityUtils.isAdmin()) {
+            return true;
+        }
+
+        try {
+            UUID currentUserId = securityUtils.getCurrentUserId();
+            if (course.getInstructorId().equals(currentUserId)) {
+                return true;
+            }
+            return enrollmentRepository.existsByStudentIdAndCourseIdAndDeletedFalse(currentUserId, course.getId());
+        } catch (ResourceNotFoundException e) {
+            return false;
+        }
+    }
+
+    private boolean isFreeCourse(CourseEntity course) {
+        BigDecimal effectivePrice = course.getDiscountPrice() != null
+                ? course.getDiscountPrice()
+                : course.getPrice();
+        return effectivePrice == null || effectivePrice.compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    private void maskPaidContentIfNeeded(LessonEntity lesson, LessonResponseDto dto, boolean canViewFullContent) {
+        if (YesNoEnum.ACTIVE.equals(lesson.getFreePreview())) {
+            return;
+        }
+        if (!canViewFullContent) {
+            dto.setVideoUrl(null);
+            dto.setVideoPublicId(null);
+            dto.setContent(null);
+            dto.setQuizId(null);
+        }
     }
 
     private ChapterEntity findActiveChapterById(UUID chapterId) {
@@ -179,30 +214,5 @@ public class ChapterServiceImpl implements ChapterService {
         if (!courseId.equals(chapter.getCourseId())) {
             throw new BusinessException(messageProvider.getMessage("exception.chapter.notBelongToCourse"));
         }
-    }
-
-    private void validateCourseOwnership(CourseEntity course) {
-        if (isAdmin()) {
-            return;
-        }
-
-        UUID currentUserId = getCurrentUserId();
-        if (!course.getInstructorId().equals(currentUserId)) {
-            throw new BusinessException(messageProvider.getMessage("exception.course.notOwner"));
-        }
-    }
-
-    private UUID getCurrentUserId() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email)
-                .map(BaseEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
-    }
-
-    private boolean isAdmin() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 }

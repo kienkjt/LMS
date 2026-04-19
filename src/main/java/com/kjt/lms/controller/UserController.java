@@ -6,6 +6,8 @@ import com.kjt.lms.model.request.profile.ChangePasswordRequest;
 import com.kjt.lms.model.request.profile.UpdateProfileRequest;
 import com.kjt.lms.model.response.user.ProfileResponse;
 import com.kjt.lms.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,30 +28,35 @@ public class UserController {
     private final MessageProvider messageProvider;
 
     @PostMapping("/change-password")
+    @Operation(summary = "Change password", security = @SecurityRequirement(name = "Bearer"))
     public APIResponse<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         userService.changePassword(request);
         return APIResponse.success(null, messageProvider.getMessage("exception.passwordChanged"));
     }
 
     @GetMapping("/profile")
+    @Operation(summary = "Get user profile", security = @SecurityRequirement(name = "Bearer"))
     public APIResponse<ProfileResponse> getProfile() {
         ProfileResponse response = userService.getProfile();
         return APIResponse.success(response, null);
     }
 
     @PutMapping("/profile")
+    @Operation(summary = "Update user profile", security = @SecurityRequirement(name = "Bearer"))
     public APIResponse<ProfileResponse> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         ProfileResponse response = userService.updateProfile(request);
         return APIResponse.success(response, messageProvider.getMessage("profile.updated.success"));
     }
 
     @PostMapping("/avatar")
+    @Operation(summary = "Upload user avatar", security = @SecurityRequirement(name = "Bearer"))
     public APIResponse<ProfileResponse> uploadAvatar(@RequestParam("file") MultipartFile file) {
         ProfileResponse response = userService.uploadAvatar(file);
         return APIResponse.success(response, messageProvider.getMessage("profile.avatar.upload.success"));
     }
 
     @DeleteMapping("/avatar")
+    @Operation(summary = "Delete user avatar", security = @SecurityRequirement(name = "Bearer"))
     public APIResponse<ProfileResponse> deleteAvatar() {
         ProfileResponse response = userService.deleteAvatar();
         return APIResponse.success(response, messageProvider.getMessage("profile.avatar.deleted.success"));

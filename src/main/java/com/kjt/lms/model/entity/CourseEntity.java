@@ -27,6 +27,12 @@ public class CourseEntity extends BaseEntity {
     @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID categoryId;
 
+    @Column(name = "thumbnail_public_id", length = 255)
+    private String thumbnailPublicId;
+
+    @Column(name = "preview_video_public_id", length = 255)
+    private String previewVideoPublicId;
+
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 

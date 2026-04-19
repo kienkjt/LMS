@@ -10,10 +10,13 @@ import com.kjt.lms.model.request.auth.ResetPasswordRequestDto;
 import com.kjt.lms.model.request.auth.VerifyOtpRequestDto;
 import com.kjt.lms.model.response.auth.LoginResponseDto;
 import com.kjt.lms.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -38,6 +41,8 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Logout from system", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<Void>> logout() {
         authService.logout();
         return ResponseEntity.ok(APIResponse.success(null, messageProvider.getMessage("auth.logout.success")));

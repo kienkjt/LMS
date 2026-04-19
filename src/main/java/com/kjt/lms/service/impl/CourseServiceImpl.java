@@ -1,8 +1,9 @@
 package com.kjt.lms.service.impl;
 
-import com.kjt.lms.common.base.BaseEntity;
+import com.kjt.lms.common.base.BaseService;
 import com.kjt.lms.common.constants.CommonStatusEnum;
 import com.kjt.lms.common.constants.CourseStatusEnum;
+import com.kjt.lms.common.constants.YesNoEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
@@ -23,19 +24,19 @@ import com.kjt.lms.model.response.media.MediaUploadResponse;
 import com.kjt.lms.repository.CategoryRepository;
 import com.kjt.lms.repository.ChapterRepository;
 import com.kjt.lms.repository.CourseRepository;
+import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonRepository;
-import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.CourseService;
 import com.kjt.lms.service.MediaStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -45,25 +46,24 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CourseServiceImpl implements CourseService {
+public class CourseServiceImpl extends BaseService implements CourseService {
 
     private final CourseRepository courseRepository;
     private final CategoryRepository categoryRepository;
-    private final UserRepository userRepository;
     private final ChapterRepository chapterRepository;
     private final LessonRepository lessonRepository;
     private final CourseMapper courseMapper;
     private final MessageProvider messageProvider;
     private final MediaStorageService mediaStorageService;
+    private final EnrollmentRepository enrollmentRepository;
 
     @Override
     @Transactional
     public CourseCreateResponseDto createCourse(CreateCourseRequestDto request) {
-        UUID instructorId = getCurrentUserId();
+        UUID instructorId = securityUtils.getCurrentUserId();
         validateCategoryId(request.getCategoryId());
 
         CourseEntity savedCourse = courseRepository.save(courseMapper.toCreateEntity(request, instructorId));
-
         log.info("Course created: {} by instructor: {}", savedCourse.getId(), instructorId);
         return courseRepository.findCreateResponseById(savedCourse.getId())
                 .orElseGet(() -> courseMapper.toCreateResponse(savedCourse));
@@ -72,26 +72,19 @@ public class CourseServiceImpl implements CourseService {
     @Override
     @Transactional
     public CourseUpdateResponseDto updateCourse(UUID courseId, UpdateCourseRequestDto request) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
-
-        UUID instructorId = getCurrentUserId();
-        validateCourseOwnership(course, instructorId);
+        CourseEntity course = getOwnedCourse(courseId);
         validateCategoryId(request.getCategoryId());
 
         courseMapper.updateCourseFromRequest(request, course);
         CourseEntity updatedCourse = courseRepository.save(course);
 
-        log.info("Course updated: {} by instructor: {}", courseId, instructorId);
+        log.info("Course updated: {}", courseId);
         return courseMapper.toDto(updatedCourse);
     }
 
     @Override
     public CourseDetailResponseDto getCourseById(UUID courseId) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
+        CourseEntity course = findActiveCourseById(courseId);
 
         CourseDetailResponseDto detailResponse = buildCourseDetailResponse(course);
         courseRepository.findInstructorNameByCourseId(courseId).ifPresent(detailResponse::setInstructorName);
@@ -100,7 +93,7 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     public Page<CourseListItemResponseDto> getInstructorCourses(Pageable pageable) {
-        UUID instructorId = getCurrentUserId();
+        UUID instructorId = securityUtils.getCurrentUserId();
         return courseRepository.findInstructorCoursesWithInstructorName(instructorId, pageable);
     }
 
@@ -168,73 +161,45 @@ public class CourseServiceImpl implements CourseService {
     @Override
     @Transactional
     public CourseUpdateResponseDto publishCourse(UUID courseId) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
+        CourseEntity course = getOwnedCourse(courseId);
 
-        UUID instructorId = getCurrentUserId();
-        validateCourseOwnership(course, instructorId);
-
-        // Validate status workflow: check if already published
-        if (course.getStatus() == CourseStatusEnum.PUBLISHED) {
-            throw new BusinessException(
-                    messageProvider.getMessage("exception.course.alreadyPublished"));
-        }
-
-        // Validate only DRAFT or REJECTED can be published
-        if (!isPublishableStatus(course.getStatus())) {
-            throw new BusinessException(
-                    String.format("Cannot publish course in %s status", course.getStatus()));
-        }
+        validateCoursePublishableState(course);
 
         log.info("Publishing course: {} (from {} to PUBLISHED)", courseId, course.getStatus());
-
         course.setStatus(CourseStatusEnum.PUBLISHED);
         CourseEntity updatedCourse = courseRepository.save(course);
 
-        log.info("Course published: {} by instructor: {}", courseId, instructorId);
+        log.info("Course published: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
         return courseMapper.toDto(updatedCourse);
     }
 
     @Override
     @Transactional
     public CourseUpdateResponseDto unpublishCourse(UUID courseId) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
+        CourseEntity course = getOwnedCourse(courseId);
 
-        UUID instructorId = getCurrentUserId();
-        validateCourseOwnership(course, instructorId);
-
-        // Validate status workflow: only PUBLISHED can be unpublished
         if (course.getStatus() != CourseStatusEnum.PUBLISHED) {
             throw new BusinessException(
                     String.format("Cannot unpublish course in %s status", course.getStatus()));
         }
 
         log.info("Unpublishing course: {} (from PUBLISHED to DRAFT)", courseId);
-
         course.setStatus(CourseStatusEnum.DRAFT);
         CourseEntity updatedCourse = courseRepository.save(course);
 
-        log.info("Course unpublished: {} by instructor: {}", courseId, instructorId);
+        log.info("Course unpublished: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
         return courseMapper.toDto(updatedCourse);
     }
 
     @Override
     @Transactional
     public void deleteCourse(UUID courseId) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
-
-        UUID instructorId = getCurrentUserId();
-        validateCourseOwnership(course, instructorId);
+        CourseEntity course = getOwnedCourse(courseId);
 
         course.setDeleted(true);
         courseRepository.save(course);
 
-        log.info("Course deleted: {} by instructor: {}", courseId, instructorId);
+        log.info("Course deleted: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
     }
 
     @Override
@@ -244,9 +209,11 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        if (course.getStatus() == CourseStatusEnum.APPROVED) {
+        // State machine: only PUBLISHED can be approved
+        if (course.getStatus() != CourseStatusEnum.PUBLISHED) {
             throw new BusinessException(
-                    messageProvider.getMessage("exception.course.alreadyApproved"));
+                    String.format("Cannot approve course in %s status. Only PUBLISHED courses can be approved.",
+                            course.getStatus()));
         }
 
         course.setStatus(CourseStatusEnum.APPROVED);
@@ -264,6 +231,12 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
+        if (course.getStatus() != CourseStatusEnum.PUBLISHED) {
+            throw new BusinessException(
+                    String.format("Cannot reject course in %s status. Only PUBLISHED courses can be rejected.",
+                            course.getStatus()));
+        }
+
         course.setStatus(CourseStatusEnum.REJECTED);
         course.setRejectReason(reason);
         CourseEntity updatedCourse = courseRepository.save(course);
@@ -276,27 +249,19 @@ public class CourseServiceImpl implements CourseService {
     @Override
     @Transactional
     public CourseUpdateResponseDto uploadCourseImage(UUID courseId, MultipartFile file) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
-
-        UUID instructorId = getCurrentUserId();
-        validateCourseOwnership(course, instructorId);
+        CourseEntity course = getOwnedCourse(courseId);
 
         try {
             MediaUploadResponse uploadResponse = mediaStorageService.uploadCourseImage(file);
 
             if (course.getThumbnail() != null && !course.getThumbnail().isEmpty()) {
-                String oldPublicId = extractPublicIdFromUrl(course.getThumbnail());
-                if (oldPublicId != null) {
-                    mediaStorageService.deleteMedia(oldPublicId, "image");
-                }
+                deleteOldMedia(course.getThumbnail(), "image");
             }
 
             course.setThumbnail(uploadResponse.getSecureUrl());
             CourseEntity updatedCourse = courseRepository.save(course);
 
-            log.info("Course image uploaded: {} by instructor: {}", courseId, instructorId);
+            log.info("Course image uploaded: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
             return courseMapper.toDto(updatedCourse);
 
         } catch (Exception ex) {
@@ -308,53 +273,38 @@ public class CourseServiceImpl implements CourseService {
     @Override
     @Transactional
     public CourseUpdateResponseDto uploadCoursePreviewVideo(UUID courseId, MultipartFile file) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
-
-        UUID instructorId = getCurrentUserId();
-        validateCourseOwnership(course, instructorId);
+        CourseEntity course = getOwnedCourse(courseId);
 
         try {
             MediaUploadResponse uploadResponse = mediaStorageService.uploadCourseVideo(file);
 
             if (course.getPreviewVideoUrl() != null && !course.getPreviewVideoUrl().isEmpty()) {
-                String oldPublicId = extractPublicIdFromUrl(course.getPreviewVideoUrl());
-                if (oldPublicId != null) {
-                    mediaStorageService.deleteMedia(oldPublicId, "video");
-                }
+                deleteOldMedia(course.getPreviewVideoUrl(), "video");
             }
 
             course.setPreviewVideoUrl(uploadResponse.getSecureUrl());
             CourseEntity updatedCourse = courseRepository.save(course);
 
-            log.info("Course preview video uploaded: {} by instructor: {}", courseId, instructorId);
+            log.info("Course preview video uploaded: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
             return courseMapper.toDto(updatedCourse);
 
         } catch (Exception ex) {
-            log.error("FULL ERROR upload video", ex);
-            throw ex;
+            log.error("Course preview video upload failed: {} - {}", courseId, ex.getMessage());
+            throw new BusinessException(messageProvider.getMessage("media.course.video.upload.failed"));
         }
     }
 
     private CourseDetailResponseDto buildCourseDetailResponse(CourseEntity course) {
+        boolean canViewFullContent = canUserViewFullContent(course);
+
         List<ChapterEntity> chapters = chapterRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(course.getId());
-        Map<UUID, List<LessonEntity>> lessonsByChapter = lessonRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(course.getId())
-                .stream()
+        List<LessonEntity> allLessons = lessonRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(course.getId());
+
+        Map<UUID, List<LessonEntity>> lessonsByChapter = allLessons.stream()
                 .collect(Collectors.groupingBy(LessonEntity::getChapterId));
 
         List<ChapterResponseDto> chapterResponses = chapters.stream()
-                .map(chapter -> {
-                    List<LessonResponseDto> lessons = lessonsByChapter
-                            .getOrDefault(chapter.getId(), Collections.emptyList())
-                            .stream()
-                            .map(courseMapper::toLessonDto)
-                            .toList();
-
-                    ChapterResponseDto chapterResponse = courseMapper.toChapterDto(chapter);
-                    chapterResponse.setLessons(lessons);
-                    return chapterResponse;
-                })
+                .map(chapter -> buildChapterResponse(chapter, lessonsByChapter, canViewFullContent))
                 .toList();
 
         CourseDetailResponseDto detail = courseMapper.toDetailDto(course);
@@ -362,12 +312,62 @@ public class CourseServiceImpl implements CourseService {
         return detail;
     }
 
-    private UUID getCurrentUserId() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email)
-                .map(BaseEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
+    private ChapterResponseDto buildChapterResponse(
+            ChapterEntity chapter,
+            Map<UUID, List<LessonEntity>> lessonsByChapter,
+            boolean canViewFullContent) {
+        List<LessonResponseDto> lessons = lessonsByChapter
+                .getOrDefault(chapter.getId(), Collections.emptyList())
+                .stream()
+                .map(lesson -> {
+                    LessonResponseDto dto = courseMapper.toLessonDto(lesson);
+                    maskPaidContentIfNeeded(lesson, dto, canViewFullContent);
+                    return dto;
+                })
+                .toList();
+
+        ChapterResponseDto chapterResponse = courseMapper.toChapterDto(chapter);
+        chapterResponse.setLessons(lessons);
+        return chapterResponse;
+    }
+
+    private boolean canUserViewFullContent(CourseEntity course) {
+        if (isFreeCourse(course)) {
+            return true;
+        }
+
+        if (securityUtils.isAdmin()) {
+            return true;
+        }
+
+        try {
+            UUID currentUserId = securityUtils.getCurrentUserId();
+            if (course.getInstructorId().equals(currentUserId)) {
+                return true;
+            }
+            return enrollmentRepository.existsByStudentIdAndCourseIdAndDeletedFalse(currentUserId, course.getId());
+        } catch (ResourceNotFoundException e) {
+            return false;
+        }
+    }
+
+    private boolean isFreeCourse(CourseEntity course) {
+        BigDecimal effectivePrice = course.getDiscountPrice() != null
+                ? course.getDiscountPrice()
+                : course.getPrice();
+        return effectivePrice == null || effectivePrice.compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    private void maskPaidContentIfNeeded(LessonEntity lesson, LessonResponseDto dto, boolean canViewFullContent) {
+        if (YesNoEnum.ACTIVE.equals(lesson.getFreePreview())) {
+            return;
+        }
+        if (!canViewFullContent) {
+            dto.setVideoUrl(null);
+            dto.setVideoPublicId(null);
+            dto.setContent(null);
+            dto.setQuizId(null);
+        }
     }
 
     private void validateCategoryId(UUID categoryId) {
@@ -380,14 +380,36 @@ public class CourseServiceImpl implements CourseService {
                         messageProvider.getMessage("exception.category.notFound")));
     }
 
-    private void validateCourseOwnership(CourseEntity course, UUID currentUserId) {
-        if (!course.getInstructorId().equals(currentUserId)) {
-            throw new BusinessException(messageProvider.getMessage("exception.course.notOwner"));
+
+    private CourseEntity getOwnedCourse(UUID courseId) {
+        CourseEntity course = findActiveCourseById(courseId);
+        validateCourseOwnership(course);
+        return course;
+    }
+
+
+    private void validateCoursePublishableState(CourseEntity course) {
+        if (!isPublishableStatus(course.getStatus())) {
+            throw new BusinessException(
+                    String.format("Cannot publish course in %s status. Only DRAFT or REJECTED can be published.",
+                            course.getStatus()));
         }
     }
 
     private boolean isPublishableStatus(CourseStatusEnum status) {
         return status == CourseStatusEnum.DRAFT || status == CourseStatusEnum.REJECTED;
+    }
+
+
+    private void deleteOldMedia(String mediaUrl, String resourceType) {
+        try {
+            String publicId = extractPublicIdFromUrl(mediaUrl);
+            if (publicId != null && !publicId.isEmpty()) {
+                mediaStorageService.deleteMedia(publicId, resourceType);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to delete old {}: {} - {}", resourceType, mediaUrl, e.getMessage());
+        }
     }
 
     private String extractPublicIdFromUrl(String cloudinaryUrl) {

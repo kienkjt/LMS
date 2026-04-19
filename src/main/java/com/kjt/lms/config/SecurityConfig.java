@@ -57,6 +57,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
                         .requestMatchers("/api/v1/user/**").hasAnyRole("ADMIN", "INSTRUCTOR", "STUDENT")
                         .requestMatchers("/api/v1/courses/**").hasAnyRole("ADMIN", "INSTRUCTOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/courses/{courseId}/chapters/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/courses/{courseId}/chapters/{chapterId}/lessons/**").permitAll()
                         .requestMatchers("/api/v1/categories/**").hasRole("ADMIN")
                         .anyRequest().authenticated());
 

@@ -1,6 +1,7 @@
 package com.kjt.lms.service.impl;
 
-import com.kjt.lms.common.base.BaseEntity;
+import com.kjt.lms.common.base.BaseService;
+import com.kjt.lms.common.constants.YesNoEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
@@ -13,31 +14,28 @@ import com.kjt.lms.model.request.lesson.UpdateLessonRequestDto;
 import com.kjt.lms.model.response.lesson.LessonResponseDto;
 import com.kjt.lms.model.response.media.MediaUploadResponse;
 import com.kjt.lms.repository.ChapterRepository;
-import com.kjt.lms.repository.CourseRepository;
+import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonRepository;
-import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.LessonService;
 import com.kjt.lms.service.MediaStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class LessonServiceImpl implements LessonService {
+public class LessonServiceImpl extends BaseService implements LessonService {
 
     private final LessonRepository lessonRepository;
     private final ChapterRepository chapterRepository;
-    private final CourseRepository courseRepository;
-    private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final LessonMapper lessonMapper;
     private final MessageProvider messageProvider;
     private final MediaStorageService mediaStorageService;
@@ -59,33 +57,41 @@ public class LessonServiceImpl implements LessonService {
         updateAggregateFields(course, chapter);
 
         log.info("Lesson created: {} for chapter: {} in course: {}", savedLesson.getId(), chapterId, courseId);
-
         return lessonMapper.toDto(savedLesson);
     }
 
     @Override
     @Transactional(readOnly = true)
     public LessonResponseDto getLessonById(UUID courseId, UUID chapterId, UUID lessonId) {
-        findActiveCourseById(courseId);
+        CourseEntity course = findActiveCourseById(courseId);
         ChapterEntity chapter = findActiveChapterById(chapterId);
         validateChapterBelongsToCourse(courseId, chapter);
 
         LessonEntity lesson = findActiveLessonById(lessonId);
         validateLessonBelongsToChapterAndCourse(courseId, chapterId, lesson);
 
-        return lessonMapper.toDto(lesson);
+        boolean canViewFullContent = canUserViewFullContent(course);
+        LessonResponseDto dto = lessonMapper.toDto(lesson);
+        maskPaidContentIfNeeded(lesson, dto, canViewFullContent);
+        return dto;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<LessonResponseDto> getLessonsByChapter(UUID courseId, UUID chapterId) {
-        findActiveCourseById(courseId);
+        CourseEntity course = findActiveCourseById(courseId);
         ChapterEntity chapter = findActiveChapterById(chapterId);
         validateChapterBelongsToCourse(courseId, chapter);
 
+        boolean canViewFullContent = canUserViewFullContent(course);
+
         return lessonRepository.findByCourseIdAndChapterIdAndDeletedFalseOrderByCreatedAtAsc(courseId, chapterId)
                 .stream()
-                .map(lessonMapper::toDto)
+                .map(lesson -> {
+                    LessonResponseDto dto = lessonMapper.toDto(lesson);
+                    maskPaidContentIfNeeded(lesson, dto, canViewFullContent);
+                    return dto;
+                })
                 .toList();
     }
 
@@ -110,7 +116,6 @@ public class LessonServiceImpl implements LessonService {
         updateAggregateFields(course, chapter);
 
         log.info("Lesson updated: {}", lessonId);
-
         return lessonMapper.toDto(updatedLesson);
     }
 
@@ -165,24 +170,12 @@ public class LessonServiceImpl implements LessonService {
 
             log.info("Lesson video uploaded: {} in chapter: {} of course: {}", lessonId, chapterId, courseId);
             return lessonMapper.toDto(updatedLesson);
-
         } catch (Exception ex) {
             log.error("Lesson video upload failed: {} - {}", lessonId, ex.getMessage());
             throw new BusinessException(messageProvider.getMessage("media.lesson.video.upload.failed"));
         }
     }
 
-    private CourseEntity findActiveCourseById(UUID courseId) {
-        CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.course.notFound")));
-
-        if (Boolean.TRUE.equals(course.getDeleted())) {
-            throw new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound"));
-        }
-
-        return course;
-    }
 
     private ChapterEntity findActiveChapterById(UUID chapterId) {
         return chapterRepository.findByIdAndDeletedFalse(chapterId)
@@ -202,6 +195,12 @@ public class LessonServiceImpl implements LessonService {
         }
     }
 
+    private void validateChapterBelongsToCourse(UUID courseId, ChapterEntity chapter) {
+        if (!courseId.equals(chapter.getCourseId())) {
+            throw new BusinessException(messageProvider.getMessage("exception.chapter.notBelongToCourse"));
+        }
+    }
+
     private void updateAggregateFields(CourseEntity course, ChapterEntity chapter) {
         chapter.setTotalLessons(Math.toIntExact(lessonRepository.countByChapterIdAndDeletedFalse(chapter.getId())));
         chapter.setTotalDuration(lessonRepository.sumDurationByChapterId(chapter.getId()));
@@ -212,35 +211,44 @@ public class LessonServiceImpl implements LessonService {
         courseRepository.save(course);
     }
 
-    private void validateChapterBelongsToCourse(UUID courseId, ChapterEntity chapter) {
-        if (!courseId.equals(chapter.getCourseId())) {
-            throw new BusinessException(messageProvider.getMessage("exception.chapter.notBelongToCourse"));
+
+    private boolean canUserViewFullContent(CourseEntity course) {
+        if (isFreeCourse(course)) {
+            return true;
+        }
+
+        if (securityUtils.isAdmin()) {
+            return true;
+        }
+
+        try {
+            UUID currentUserId = securityUtils.getCurrentUserId();
+            if (course.getInstructorId().equals(currentUserId)) {
+                return true;
+            }
+            return enrollmentRepository.existsByStudentIdAndCourseIdAndDeletedFalse(currentUserId, course.getId());
+        } catch (ResourceNotFoundException e) {
+            return false;
         }
     }
 
-    private void validateCourseOwnership(CourseEntity course) {
-        if (isAdmin()) {
+    private boolean isFreeCourse(CourseEntity course) {
+        BigDecimal effectivePrice = course.getDiscountPrice() != null
+                ? course.getDiscountPrice()
+                : course.getPrice();
+        return effectivePrice == null || effectivePrice.compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    private void maskPaidContentIfNeeded(LessonEntity lesson, LessonResponseDto dto, boolean canViewFullContent) {
+        if (YesNoEnum.ACTIVE.equals(lesson.getFreePreview())) {
             return;
         }
-
-        UUID currentUserId = getCurrentUserId();
-        if (!course.getInstructorId().equals(currentUserId)) {
-            throw new BusinessException(messageProvider.getMessage("exception.course.notOwner"));
+        if (!canViewFullContent) {
+            dto.setVideoUrl(null);
+            dto.setVideoPublicId(null);
+            dto.setContent(null);
+            dto.setQuizId(null);
         }
-    }
-
-    private UUID getCurrentUserId() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email)
-                .map(BaseEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.user.notfound")));
-    }
-
-    private boolean isAdmin() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 }
 
