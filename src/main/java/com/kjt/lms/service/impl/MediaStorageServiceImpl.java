@@ -121,7 +121,7 @@ public class MediaStorageServiceImpl implements MediaStorageService {
     @Override
     public void deleteMedia(String publicId, String resourceType) {
         if (publicId == null || publicId.isEmpty()) {
-            throw new BusinessException("Public ID tidak boleh kosong");
+            throw new BusinessException(messageProvider.getMessage("exception.media.publicIdEmpty"));
         }
 
         try {
@@ -223,7 +223,7 @@ public class MediaStorageServiceImpl implements MediaStorageService {
         Object duration = uploadResult.get("duration");
 
         if (secureUrl == null || publicId == null) {
-            throw new BusinessException("Upload response không chứa URL hoặc public ID");
+            throw new BusinessException(messageProvider.getMessage("exception.media.uploadResponseInvalid"));
         }
 
         return MediaUploadResponse.builder()

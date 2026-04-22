@@ -2,6 +2,7 @@ package com.kjt.lms.service.impl;
 
 import com.kjt.lms.common.base.BaseService;
 import com.kjt.lms.common.constants.OrderStatusEnum;
+import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
 import com.kjt.lms.model.entity.CartEntity;
@@ -10,7 +11,6 @@ import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.OrderEntity;
 import com.kjt.lms.model.entity.OrderItemEntity;
 import com.kjt.lms.model.request.order.CheckoutRequestDto;
-import com.kjt.lms.model.response.order.OrderItemResponseDto;
 import com.kjt.lms.model.response.order.OrderResponseDto;
 import com.kjt.lms.repository.CartItemRepository;
 import com.kjt.lms.repository.CartRepository;
@@ -20,6 +20,7 @@ import com.kjt.lms.repository.OrderItemRepository;
 import com.kjt.lms.repository.OrderRepository;
 import com.kjt.lms.service.CartService;
 import com.kjt.lms.service.OrderService;
+import com.kjt.lms.mapper.OrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -47,6 +48,8 @@ public class OrderServiceImpl extends BaseService implements OrderService {
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CartService cartService;
+    private final OrderMapper orderMapper;
+    private final MessageProvider messageProvider;
 
     private String generateOrderCode() {
         return "ORD-" + System.currentTimeMillis() + "-" + (int) (Math.random() * 1000);
@@ -57,11 +60,11 @@ public class OrderServiceImpl extends BaseService implements OrderService {
     public OrderResponseDto checkoutCart(CheckoutRequestDto request) {
         UUID userId = securityUtils.getCurrentUserId();
         CartEntity cart = cartRepository.findByUserIdAndDeletedFalse(userId)
-                .orElseThrow(() -> new BusinessException("Cart is empty"));
+                .orElseThrow(() -> new BusinessException(messageProvider.getMessage("exception.cart.empty")));
 
         List<CartItemEntity> cartItems = cartItemRepository.findByCartIdAndDeletedFalse(cart.getId());
         if (cartItems.isEmpty()) {
-            throw new BusinessException("Cart is empty");
+            throw new BusinessException(messageProvider.getMessage("exception.cart.empty"));
         }
 
         OrderEntity order = OrderEntity.builder()
@@ -79,10 +82,10 @@ public class OrderServiceImpl extends BaseService implements OrderService {
 
         for (CartItemEntity cartItem : cartItems) {
             CourseEntity course = courseRepository.findById(cartItem.getCourseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound")));
 
             if (enrollmentRepository.existsByStudentIdAndCourseIdAndDeletedFalse(userId, course.getId())) {
-                throw new BusinessException("You are already enrolled in: " + course.getTitle());
+                throw new BusinessException(messageProvider.getMessage("exception.enrollment.alreadyEnrolled", course.getTitle()));
             }
 
             OrderItemEntity orderItem = OrderItemEntity.builder()
@@ -107,10 +110,10 @@ public class OrderServiceImpl extends BaseService implements OrderService {
     public OrderResponseDto getOrderById(UUID orderId) {
         UUID userId = securityUtils.getCurrentUserId();
         OrderEntity order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.order.notFound")));
 
         if (!order.getStudentId().equals(userId) && !securityUtils.isAdmin()) {
-            throw new BusinessException("Access denied");
+            throw new BusinessException(messageProvider.getMessage("exception.order.accessDenied"));
         }
 
         return mapToDto(order);
@@ -128,26 +131,6 @@ public class OrderServiceImpl extends BaseService implements OrderService {
 
     private OrderResponseDto mapToDto(OrderEntity order) {
         List<OrderItemEntity> items = orderItemRepository.findByOrderId(order.getId());
-        List<OrderItemResponseDto> itemDtos = items.stream().map(item ->
-                OrderItemResponseDto.builder()
-                        .id(item.getId())
-                        .courseId(item.getCourseId())
-                        .courseTitle(item.getCourseTitle())
-                        .courseThumbnail(item.getCourseThumbnail())
-                        .paidPrice(item.getPaidPrice())
-                        .build()
-        ).collect(Collectors.toList());
-
-        return OrderResponseDto.builder()
-                .id(order.getId())
-                .orderCode(order.getOrderCode())
-                .totalAmount(order.getTotalAmount())
-                .status(order.getStatus())
-                .paymentMethod(order.getPaymentMethod())
-                .transactionId(order.getTransactionId())
-                .paidAt(order.getPaidAt())
-                .createdAt(order.getCreatedAt())
-                .items(itemDtos)
-                .build();
+        return orderMapper.toResponse(order, items);
     }
 }

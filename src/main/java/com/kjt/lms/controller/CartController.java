@@ -1,5 +1,6 @@
 package com.kjt.lms.controller;
 
+import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.model.request.cart.AddToCartRequestDto;
 import com.kjt.lms.model.response.cart.CartResponseDto;
@@ -23,32 +24,35 @@ import java.util.UUID;
 public class CartController {
 
     private final CartService cartService;
+    private final MessageProvider messageProvider;
 
     @GetMapping
     @Operation(summary = "Get current user's cart", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<CartResponseDto>> getMyCart() {
         CartResponseDto response = cartService.getMyCart();
-        return ResponseEntity.ok(APIResponse.success(response, "Cart retrieved successfully"));
+        return ResponseEntity.ok(APIResponse.success(response, null));
     }
 
     @PostMapping("/add")
     @Operation(summary = "Add a course to cart", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<CartResponseDto>> addToCart(@Valid @RequestBody AddToCartRequestDto request) {
         CartResponseDto response = cartService.addToCart(request);
-        return ResponseEntity.ok(APIResponse.success(response, "Added to cart successfully"));
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("cart.add.success")));
     }
 
     @DeleteMapping("/items/{cartItemId}")
     @Operation(summary = "Remove an item from cart", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<CartResponseDto>> removeFromCart(@PathVariable UUID cartItemId) {
         CartResponseDto response = cartService.removeFromCart(cartItemId);
-        return ResponseEntity.ok(APIResponse.success(response, "Removed from cart successfully"));
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("cart.remove.success")));
     }
 
     @DeleteMapping("/clear")
     @Operation(summary = "Clear all items from cart", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<Void>> clearCart() {
         cartService.clearCart();
-        return ResponseEntity.ok(APIResponse.success(null, "Cart cleared successfully"));
+        return ResponseEntity.ok(APIResponse.success(null, messageProvider.getMessage("cart.clear.success")));
     }
 }
+
+

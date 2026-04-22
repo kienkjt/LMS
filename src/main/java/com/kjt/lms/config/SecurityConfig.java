@@ -51,7 +51,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
                                 "/webjars/**",
-                                "/error"
+                                "/error",
+                                "/api/v1/payments/vnpay/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/courses/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()

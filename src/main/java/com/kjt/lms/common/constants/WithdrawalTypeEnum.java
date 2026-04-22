@@ -5,23 +5,24 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum PaymentMethodEnum {
+public enum WithdrawalTypeEnum {
 
-    VNPAY("1", "Thanh toan VNPAY"),
-    MOMO("2", "Thanh toan MoMo");
+    REFUND("1", "Hoàn tiền"),
+    EARNINGS("2", "Rút tiền kiếm được");
 
     private final String value;
     private final String description;
 
-    public static PaymentMethodEnum fromValue(String value) {
+    public static WithdrawalTypeEnum fromValue(String value) {
         if (value == null) {
             return null;
         }
-        for (PaymentMethodEnum type : values()) {
+        for (WithdrawalTypeEnum type : values()) {
             if (type.value.equalsIgnoreCase(value.trim())) {
                 return type;
             }
         }
-        throw new IllegalArgumentException("Invalid PaymentMethod value: " + value);
+        throw new IllegalArgumentException("Invalid WithdrawalType value: " + value);
     }
 }
+

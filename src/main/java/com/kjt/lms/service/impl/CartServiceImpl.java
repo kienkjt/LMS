@@ -5,6 +5,7 @@ import com.kjt.lms.common.constants.CommonStatusEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
+import com.kjt.lms.mapper.CartMapper;
 import com.kjt.lms.model.entity.CartEntity;
 import com.kjt.lms.model.entity.CartItemEntity;
 import com.kjt.lms.model.entity.CourseEntity;
@@ -28,7 +29,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +39,7 @@ public class CartServiceImpl implements CartService {
     private final CartItemRepository cartItemRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final CartMapper cartMapper;
     private final MessageProvider messageProvider;
 
     private UUID getCurrentUserId() {
@@ -74,21 +75,21 @@ public class CartServiceImpl implements CartService {
         CartEntity cart = getOrCreateCart(userId);
 
         CourseEntity course = courseRepository.findById(request.getCourseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound")));
 
         if(Boolean.TRUE.equals(course.getDeleted()) || course.getActive() != CommonStatusEnum.ACTIVE) {
-            throw new BusinessException("Course is not available for purchase");
+            throw new BusinessException(messageProvider.getMessage("exception.enrollment.course.notAvailable"));
         }
         
         // Prevent adding own course
         if (course.getInstructorId().equals(userId)) {
-            throw new BusinessException("You cannot buy your own course");
+            throw new BusinessException(messageProvider.getMessage("exception.cart.ownCourse"));
         }
 
         // Check if already in cart
         Optional<CartItemEntity> existingItem = cartItemRepository.findByCartIdAndCourseIdAndDeletedFalse(cart.getId(), course.getId());
         if (existingItem.isPresent()) {
-            throw new BusinessException("Course is already in your cart");
+            throw new BusinessException(messageProvider.getMessage("exception.cart.alreadyExists"));
         }
 
         // Calculate price (discount price if available, else regular price)
@@ -120,7 +121,7 @@ public class CartServiceImpl implements CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
 
         if (!item.getCartId().equals(cart.getId())) {
-            throw new BusinessException("Item does not belong to your cart");
+            throw new BusinessException(messageProvider.getMessage("exception.cart.notBelongs"));
         }
 
         item.setDeleted(true);
@@ -158,29 +159,20 @@ public class CartServiceImpl implements CartService {
 
     private CartResponseDto mapToDto(CartEntity cart) {
         List<CartItemEntity> items = cartItemRepository.findByCartIdAndDeletedFalse(cart.getId());
-        
+
         List<CartItemResponseDto> itemDtos = items.stream().map(item -> {
             CourseEntity course = courseRepository.findById(item.getCourseId()).orElse(null);
-            if (course == null) return null;
-            
+            if (course == null) {
+                return null;
+            }
+
             String instructorName = userRepository.findById(course.getInstructorId())
-                                        .map(UserEntity::getFullName).orElse("Unknown");
+                    .map(UserEntity::getFullName)
+                    .orElse("Unknown");
 
-            return CartItemResponseDto.builder()
-                    .id(item.getId())
-                    .courseId(course.getId())
-                    .courseTitle(course.getTitle())
-                    .courseThumbnail(course.getThumbnail())
-                    .instructorName(instructorName)
-                    .price(item.getPrice())
-                    .originalPrice(course.getPrice())
-                    .build();
-        }).filter(Objects::nonNull).collect(Collectors.toList());
+            return cartMapper.toItemResponse(item, course, instructorName);
+        }).filter(Objects::nonNull).toList();
 
-        return CartResponseDto.builder()
-                .id(cart.getId())
-                .totalAmount(cart.getTotalAmount())
-                .items(itemDtos)
-                .build();
+        return cartMapper.toResponse(cart, itemDtos);
     }
 }

@@ -3,6 +3,7 @@ package com.kjt.lms.controller;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.model.request.order.CheckoutRequestDto;
+import com.kjt.lms.model.request.order.InitPaymentRequestDto;
 import com.kjt.lms.model.request.order.PayOrderRequestDto;
 import com.kjt.lms.model.response.order.OrderResponseDto;
 import com.kjt.lms.service.OrderService;
@@ -10,6 +11,7 @@ import com.kjt.lms.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +43,17 @@ public class OrderController {
     public ResponseEntity<APIResponse<OrderResponseDto>> checkout(@Valid @RequestBody CheckoutRequestDto request) {
         OrderResponseDto response = orderService.checkoutCart(request);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("order.checkout.success")));
+    }
+
+    @PostMapping("/{orderId}/pay/init")
+    @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Init payment URL for an existing order", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<OrderResponseDto>> initPayment(
+            @PathVariable UUID orderId,
+            @Valid @RequestBody InitPaymentRequestDto request,
+            HttpServletRequest httpRequest) {
+        OrderResponseDto response = paymentService.initPayment(orderId, request, httpRequest);
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("payment.init.success")));
     }
 
     @PostMapping("/{orderId}/pay")

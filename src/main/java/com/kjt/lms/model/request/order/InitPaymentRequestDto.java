@@ -5,8 +5,13 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class CheckoutRequestDto {
+public class InitPaymentRequestDto {
+
     @NotNull(message = "{validation.order.paymentMethod.notBlank}")
     private PaymentMethodEnum paymentMethod;
-    private String note;
+
+    private String bankCode;
+
+    private String language;
 }
+
