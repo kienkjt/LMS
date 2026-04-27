@@ -25,6 +25,8 @@ public interface CourseService {
 
     Page<CourseListItemResponseDto> searchCourses(SearchCourseRequest request, Pageable pageable);
 
+    Page<CourseListItemResponseDto> searchManagedCourses(SearchCourseRequest request, Pageable pageable);
+
     Page<CourseListItemResponseDto> getCoursesByCategory(UUID categoryId, Pageable pageable);
 
     Page<CourseListItemResponseDto> getTopRatedCourses(Pageable pageable);

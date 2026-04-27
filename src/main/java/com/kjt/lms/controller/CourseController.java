@@ -90,6 +90,18 @@ public class CourseController {
         return ResponseEntity.ok(APIResponse.success(response, null));
     }
 
+    @PostMapping("/management/search")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Search courses for course managers", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> searchManagedCourses(
+            @RequestBody(required = false) SearchCourseRequest request,
+            @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
+        Page<CourseListItemResponseDto> response = courseService.searchManagedCourses(request, pageable);
+        return ResponseEntity.ok(APIResponse.success(response, null));
+    }
+
     @GetMapping("/by-category/{categoryId}")
     @Operation(summary = "Get courses by category (published & active only)")
     public ResponseEntity<APIResponse<Page<CourseListItemResponseDto>>> getCoursesByCategory(

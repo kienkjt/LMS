@@ -1,6 +1,8 @@
 package com.kjt.lms.service.impl;
 
 import com.kjt.lms.common.base.BaseService;
+import com.kjt.lms.common.constants.CommonStatusEnum;
+import com.kjt.lms.common.constants.CourseStatusEnum;
 import com.kjt.lms.common.constants.OrderStatusEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
@@ -83,6 +85,12 @@ public class OrderServiceImpl extends BaseService implements OrderService {
         for (CartItemEntity cartItem : cartItems) {
             CourseEntity course = courseRepository.findById(cartItem.getCourseId())
                     .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound")));
+
+            if (Boolean.TRUE.equals(course.getDeleted())
+                    || course.getActive() != CommonStatusEnum.ACTIVE
+                    || (course.getStatus() != CourseStatusEnum.PUBLISHED && course.getStatus() != CourseStatusEnum.APPROVED)) {
+                throw new BusinessException(messageProvider.getMessage("exception.enrollment.course.notAvailable"));
+            }
 
             if (enrollmentRepository.existsByStudentIdAndCourseIdAndDeletedFalse(userId, course.getId())) {
                 throw new BusinessException(messageProvider.getMessage("exception.enrollment.alreadyEnrolled", course.getTitle()));

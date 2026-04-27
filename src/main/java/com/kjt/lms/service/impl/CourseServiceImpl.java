@@ -40,6 +40,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class CourseServiceImpl extends BaseService implements CourseService {
+
+    private static final Set<CourseStatusEnum> PUBLIC_VISIBLE_STATUSES = Set.of(CourseStatusEnum.PUBLISHED, CourseStatusEnum.APPROVED);
 
     private final CourseRepository courseRepository;
     private final CategoryRepository categoryRepository;
@@ -84,7 +87,7 @@ public class CourseServiceImpl extends BaseService implements CourseService {
 
     @Override
     public CourseDetailResponseDto getCourseById(UUID courseId) {
-        CourseEntity course = findActiveCourseById(courseId);
+        CourseEntity course = getAccessibleCourse(courseId);
 
         CourseDetailResponseDto detailResponse = buildCourseDetailResponse(course);
         courseRepository.findInstructorNameByCourseId(courseId).ifPresent(detailResponse::setInstructorName);
@@ -100,12 +103,12 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     @Override
     @Transactional(readOnly = true)
     public Page<CourseListItemResponseDto> searchCourses(SearchCourseRequest request, Pageable pageable) {
+        SearchCourseRequest normalizedRequest = request == null ? SearchCourseRequest.builder().build() : request;
 
-        Page<CourseListItemResponseDto> results = courseRepository.searchWithInstructorName(
-                request.getKeyword(),
-                request.getCourseStatus(),
-                request.getCourseLevel(),
-                request.getActive(),
+        Page<CourseListItemResponseDto> results = courseRepository.searchPublicWithInstructorName(
+                normalizedRequest.getKeyword(),
+                PUBLIC_VISIBLE_STATUSES,
+                CommonStatusEnum.ACTIVE,
                 pageable
         );
 
@@ -120,6 +123,22 @@ public class CourseServiceImpl extends BaseService implements CourseService {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<CourseListItemResponseDto> searchManagedCourses(SearchCourseRequest request, Pageable pageable) {
+        SearchCourseRequest normalizedRequest = request == null ? SearchCourseRequest.builder().build() : request;
+        UUID instructorId = securityUtils.isAdmin() ? null : securityUtils.getCurrentUserId();
+
+        return courseRepository.searchManagedWithInstructorName(
+                normalizedRequest.getKeyword(),
+                normalizedRequest.getCourseStatus(),
+                normalizedRequest.getCourseLevel(),
+                normalizedRequest.getActive(),
+                instructorId,
+                pageable
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<CourseListItemResponseDto> getCoursesByCategory(UUID categoryId, Pageable pageable) {
         // Validate category exists AND not deleted
         categoryRepository.findByIdAndDeletedFalse(categoryId)
@@ -128,7 +147,7 @@ public class CourseServiceImpl extends BaseService implements CourseService {
 
         return courseRepository.findCoursesByCategoryWithInstructorName(
                 categoryId,
-                CourseStatusEnum.PUBLISHED,
+                PUBLIC_VISIBLE_STATUSES,
                 CommonStatusEnum.ACTIVE,
                 pageable
         );
@@ -137,25 +156,13 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     @Override
     @Transactional(readOnly = true)
     public Page<CourseListItemResponseDto> getTopRatedCourses(Pageable pageable) {
-        return courseRepository.searchWithInstructorName(
-                null,
-                CourseStatusEnum.PUBLISHED,
-                null,
-                CommonStatusEnum.ACTIVE,
-                pageable
-        );
+        return courseRepository.findTopRatedPublicCourses(PUBLIC_VISIBLE_STATUSES, CommonStatusEnum.ACTIVE, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<CourseListItemResponseDto> getTrendingCourses(Pageable pageable) {
-        return courseRepository.searchWithInstructorName(
-                null,
-                CourseStatusEnum.PUBLISHED,
-                null,
-                CommonStatusEnum.ACTIVE,
-                pageable
-        );
+        return courseRepository.findTrendingPublicCourses(PUBLIC_VISIBLE_STATUSES, CommonStatusEnum.ACTIVE, pageable);
     }
 
     @Override
@@ -387,6 +394,24 @@ public class CourseServiceImpl extends BaseService implements CourseService {
         return course;
     }
 
+    private CourseEntity getAccessibleCourse(UUID courseId) {
+        CourseEntity course = findActiveCourseById(courseId);
+        if (securityUtils.isAdmin()) {
+            return course;
+        }
+
+        UUID currentUserId = getCurrentUserIdIfAuthenticated();
+        if (currentUserId != null && course.getInstructorId().equals(currentUserId)) {
+            return course;
+        }
+
+        if (isPubliclyVisible(course)) {
+            return course;
+        }
+
+        throw new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound"));
+    }
+
 
     private void validateCoursePublishableState(CourseEntity course) {
         if (!isPublishableStatus(course.getStatus())) {
@@ -398,6 +423,19 @@ public class CourseServiceImpl extends BaseService implements CourseService {
 
     private boolean isPublishableStatus(CourseStatusEnum status) {
         return status == CourseStatusEnum.DRAFT || status == CourseStatusEnum.REJECTED;
+    }
+
+    private boolean isPubliclyVisible(CourseEntity course) {
+        return CommonStatusEnum.ACTIVE.equals(course.getActive())
+                && PUBLIC_VISIBLE_STATUSES.contains(course.getStatus());
+    }
+
+    private UUID getCurrentUserIdIfAuthenticated() {
+        try {
+            return securityUtils.getCurrentUserId();
+        } catch (ResourceNotFoundException ex) {
+            return null;
+        }
     }
 
 

@@ -29,11 +29,13 @@ public interface WithdrawalService {
 
     WithdrawalRequestResponseDto rejectWithdrawal(UUID requestId, String rejectReason);
 
+    WithdrawalRequestResponseDto cancelWithdrawalRequest(UUID requestId);
+
     WithdrawalRequestResponseDto completeWithdrawal(UUID requestId, String transactionId);
 
     InstructorWalletResponseDto getInstructorWallet();
 
-    WithdrawalRequestResponseDto createRefundWithdrawal(UUID orderId);
+    void processRefundAdjustment(UUID orderId);
 
     Page<WithdrawalRequestResponseDto> getAllWithdrawals(Pageable pageable);
 

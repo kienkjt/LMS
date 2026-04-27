@@ -139,5 +139,15 @@ public class WithdrawalController {
         return ResponseEntity.ok(APIResponse.success(response,
                 messageProvider.getMessage("withdrawal.request.completed.success")));
     }
+
+    @PostMapping("/request/{requestId}/cancel")
+    @PreAuthorize("hasRole('INSTRUCTOR')")
+    @Operation(summary = "Cancel my pending withdrawal request", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<WithdrawalRequestResponseDto>> cancelWithdrawalRequest(
+            @PathVariable UUID requestId) {
+        WithdrawalRequestResponseDto response = withdrawalService.cancelWithdrawalRequest(requestId);
+        return ResponseEntity.ok(APIResponse.success(response,
+                messageProvider.getMessage("withdrawal.request.cancelled.success")));
+    }
 }
 

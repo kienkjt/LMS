@@ -191,13 +191,14 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         order.setStatus(OrderStatusEnum.REFUNDED);
+        revokeEnrollmentsByOrder(order);
+
+        // Reverse instructor earnings immediately and persist an audit record.
+        withdrawalService.processRefundAdjustment(orderId);
+
         OrderEntity savedOrder = orderRepository.save(order);
-        revokeEnrollmentsByOrder(savedOrder);
 
-        // Create withdrawal request for instructor instead of immediate refund
-        withdrawalService.createRefundWithdrawal(orderId);
-
-        log.info("Order {} refunded with withdrawal request created", orderId);
+        log.info("Order {} refunded and instructor earnings reversed", orderId);
         return mapToDto(savedOrder);
     }
 

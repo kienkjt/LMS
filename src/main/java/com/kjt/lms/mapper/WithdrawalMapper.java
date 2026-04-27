@@ -47,9 +47,12 @@ public class WithdrawalMapper {
                 .id(entity.getId())
                 .instructorId(entity.getInstructorId())
                 .currentBalance(entity.getCurrentBalance())
+                .availableBalance(entity.getCurrentBalance())
+                .pendingWithdrawalAmount(java.math.BigDecimal.ZERO)
                 .totalEarned(entity.getTotalEarned())
                 .totalWithdrawn(entity.getTotalWithdrawn())
                 .totalCommissionDeducted(entity.getTotalCommissionDeducted())
+                .totalRefunded(entity.getTotalRefunded())
                 .build();
     }
 }

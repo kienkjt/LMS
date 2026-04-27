@@ -29,13 +29,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class WithdrawalServiceImpl extends BaseService implements WithdrawalService {
+
+    private static final EnumSet<WithdrawalStatusEnum> RESERVED_WITHDRAWAL_STATUSES =
+            EnumSet.of(WithdrawalStatusEnum.PENDING, WithdrawalStatusEnum.APPROVED);
 
     @Value("${app.withdrawal.commission-rate:10}")
     private BigDecimal defaultCommissionRate;
@@ -54,8 +60,7 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
             return;
         }
 
-        InstructorWalletEntity wallet = walletRepository.findByInstructorIdAndDeletedFalse(instructorId)
-                .orElseGet(() -> createNewWallet(instructorId));
+        InstructorWalletEntity wallet = getOrCreateWallet(instructorId);
 
         wallet.setCurrentBalance(wallet.getCurrentBalance().add(amount));
         wallet.setTotalEarned(wallet.getTotalEarned().add(amount));
@@ -99,6 +104,9 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
 
         BigDecimal commissionAmount = calculateCommission(request.getRequestedAmount(), defaultCommissionRate);
         BigDecimal netAmount = request.getRequestedAmount().subtract(commissionAmount);
+
+        wallet.setCurrentBalance(wallet.getCurrentBalance().subtract(request.getRequestedAmount()));
+        walletRepository.save(wallet);
 
         WithdrawalRequestEntity withdrawalRequest = WithdrawalRequestEntity.builder()
                 .instructorId(instructorId)
@@ -191,16 +199,37 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         entity.setRejectedAt(LocalDateTime.now());
         entity.setRejectReason(rejectReason);
 
-        // Refund the balance back to wallet
-        InstructorWalletEntity wallet = walletRepository.findByInstructorIdAndDeletedFalse(entity.getInstructorId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.wallet.notFound")));
-        wallet.setCurrentBalance(wallet.getCurrentBalance().add(entity.getRequestedAmount()));
-        walletRepository.save(wallet);
+        releaseReservedFundsIfNeeded(entity);
 
         WithdrawalRequestEntity saved = withdrawalRepository.save(entity);
         log.info("Rejected withdrawal request {} for instructor {}", requestId, entity.getInstructorId());
 
+        return withdrawalMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public WithdrawalRequestResponseDto cancelWithdrawalRequest(UUID requestId) {
+        UUID instructorId = securityUtils.getCurrentUserId();
+        WithdrawalRequestEntity entity = withdrawalRepository.findByIdAndDeletedFalse(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.withdrawal.notFound")));
+
+        if (!entity.getInstructorId().equals(instructorId)) {
+            throw new BusinessException(messageProvider.getMessage("exception.withdrawal.accessDenied"));
+        }
+
+        if (entity.getStatus() != WithdrawalStatusEnum.PENDING) {
+            throw new BusinessException(messageProvider.getMessage("exception.withdrawal.invalidStatus"));
+        }
+
+        entity.setStatus(WithdrawalStatusEnum.CANCELLED);
+        entity.setRejectedAt(LocalDateTime.now());
+        entity.setRejectReason("Cancelled by instructor");
+        releaseReservedFundsIfNeeded(entity);
+
+        WithdrawalRequestEntity saved = withdrawalRepository.save(entity);
+        log.info("Cancelled withdrawal request {} for instructor {}", requestId, instructorId);
         return withdrawalMapper.toResponse(saved);
     }
 
@@ -221,16 +250,15 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         entity.setCompletedAt(LocalDateTime.now());
         entity.setTransactionId(transactionId);
 
-        // Update wallet with final deductions
-        InstructorWalletEntity wallet = walletRepository.findByInstructorIdAndDeletedFalse(entity.getInstructorId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.wallet.notFound")));
+        if (entity.getType() == WithdrawalTypeEnum.EARNINGS) {
+            InstructorWalletEntity wallet = walletRepository.findByInstructorIdAndDeletedFalse(entity.getInstructorId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            messageProvider.getMessage("exception.wallet.notFound")));
+            wallet.setTotalWithdrawn(wallet.getTotalWithdrawn().add(zeroIfNull(entity.getNetAmount())));
+            wallet.setTotalCommissionDeducted(wallet.getTotalCommissionDeducted().add(zeroIfNull(entity.getCommissionAmount())));
+            walletRepository.save(wallet);
+        }
 
-        wallet.setCurrentBalance(wallet.getCurrentBalance().subtract(entity.getRequestedAmount()));
-        wallet.setTotalWithdrawn(wallet.getTotalWithdrawn().add(entity.getNetAmount()));
-        wallet.setTotalCommissionDeducted(wallet.getTotalCommissionDeducted().add(entity.getCommissionAmount()));
-
-        walletRepository.save(wallet);
         WithdrawalRequestEntity saved = withdrawalRepository.save(entity);
 
         log.info("Completed withdrawal request {} for instructor {} with transaction {}",
@@ -243,56 +271,41 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
     @Transactional(readOnly = true)
     public InstructorWalletResponseDto getInstructorWallet() {
         UUID instructorId = securityUtils.getCurrentUserId();
-        InstructorWalletEntity wallet = walletRepository.findByInstructorIdAndDeletedFalse(instructorId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.wallet.notFound")));
+        InstructorWalletEntity wallet = getOrCreateWallet(instructorId);
+        BigDecimal pendingWithdrawalAmount = getPendingWithdrawalAmount(instructorId);
 
-        return withdrawalMapper.toWalletResponse(wallet);
+        InstructorWalletResponseDto response = withdrawalMapper.toWalletResponse(wallet);
+        response.setPendingWithdrawalAmount(pendingWithdrawalAmount);
+        response.setAvailableBalance(wallet.getCurrentBalance());
+        return response;
     }
 
     @Override
     @Transactional
-    public WithdrawalRequestResponseDto createRefundWithdrawal(UUID orderId) {
+    public void processRefundAdjustment(UUID orderId) {
         List<OrderItemEntity> orderItems = orderItemRepository.findByOrderId(orderId);
 
         if (orderItems.isEmpty()) {
             throw new ResourceNotFoundException(messageProvider.getMessage("exception.order.itemsNotFound"));
         }
 
-        // Group by instructor and create withdrawal for each
-        return orderItems.stream()
+        Map<UUID, BigDecimal> refundByInstructor = orderItems.stream()
                 .filter(item -> item.getInstructorId() != null)
-                .findFirst()
-                .map(firstItem -> {
-                    UUID instructorId = firstItem.getInstructorId();
-                    BigDecimal totalRefund = orderItems.stream()
-                            .filter(item -> instructorId.equals(item.getInstructorId()))
-                            .map(OrderItemEntity::getInstructorRevenue)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .collect(Collectors.groupingBy(
+                        OrderItemEntity::getInstructorId,
+                        Collectors.mapping(
+                                item -> zeroIfNull(item.getInstructorRevenue()),
+                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
+                        )
+                ));
 
-                    BigDecimal commissionAmount = calculateCommission(totalRefund, defaultCommissionRate);
-                    BigDecimal netAmount = totalRefund.subtract(commissionAmount);
+        if (refundByInstructor.isEmpty()) {
+            throw new ResourceNotFoundException(messageProvider.getMessage("exception.withdrawal.noInstructor"));
+        }
 
-                    WithdrawalRequestEntity refund = WithdrawalRequestEntity.builder()
-                            .instructorId(instructorId)
-                            .orderId(orderId)
-                            .type(WithdrawalTypeEnum.REFUND)
-                            .status(WithdrawalStatusEnum.PENDING)
-                            .requestedAmount(totalRefund)
-                            .commissionRate(defaultCommissionRate)
-                            .commissionAmount(commissionAmount)
-                            .netAmount(netAmount)
-                            .reason("Refund for order: " + orderId)
-                            .build();
-
-                    WithdrawalRequestEntity saved = withdrawalRepository.save(refund);
-                    log.info("Created refund withdrawal request {} for instructor {} on order {}",
-                             saved.getId(), instructorId, orderId);
-
-                    return withdrawalMapper.toResponse(saved);
-                })
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        messageProvider.getMessage("exception.withdrawal.noInstructor")));
+        for (Map.Entry<UUID, BigDecimal> entry : refundByInstructor.entrySet()) {
+            createRefundLedgerEntry(orderId, entry.getKey(), entry.getValue());
+        }
     }
 
     @Override
@@ -318,8 +331,77 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
                 .totalEarned(BigDecimal.ZERO)
                 .totalWithdrawn(BigDecimal.ZERO)
                 .totalCommissionDeducted(BigDecimal.ZERO)
+                .totalRefunded(BigDecimal.ZERO)
                 .build();
         return walletRepository.save(wallet);
+    }
+
+    private InstructorWalletEntity getOrCreateWallet(UUID instructorId) {
+        return walletRepository.findByInstructorIdAndDeletedFalse(instructorId)
+                .orElseGet(() -> createNewWallet(instructorId));
+    }
+
+    private void releaseReservedFundsIfNeeded(WithdrawalRequestEntity entity) {
+        if (entity.getType() != WithdrawalTypeEnum.EARNINGS) {
+            return;
+        }
+
+        InstructorWalletEntity wallet = walletRepository.findByInstructorIdAndDeletedFalse(entity.getInstructorId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.wallet.notFound")));
+        wallet.setCurrentBalance(wallet.getCurrentBalance().add(entity.getRequestedAmount()));
+        walletRepository.save(wallet);
+    }
+
+    private BigDecimal getPendingWithdrawalAmount(UUID instructorId) {
+        return zeroIfNull(withdrawalRepository.sumRequestedAmountByInstructorIdAndTypeAndStatusInAndDeletedFalse(
+                instructorId,
+                WithdrawalTypeEnum.EARNINGS,
+                RESERVED_WITHDRAWAL_STATUSES
+        ));
+    }
+
+    private void createRefundLedgerEntry(UUID orderId, UUID instructorId, BigDecimal refundAmount) {
+        if (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        if (withdrawalRepository.existsByOrderIdAndInstructorIdAndTypeAndDeletedFalse(
+                orderId, instructorId, WithdrawalTypeEnum.REFUND)) {
+            throw new BusinessException(messageProvider.getMessage("exception.refund.alreadyProcessed"));
+        }
+
+        InstructorWalletEntity wallet = getOrCreateWallet(instructorId);
+        if (wallet.getCurrentBalance().compareTo(refundAmount) < 0) {
+            throw new BusinessException(messageProvider.getMessage("exception.refund.walletInsufficientBalance"));
+        }
+
+        if (wallet.getTotalEarned().compareTo(refundAmount) < 0) {
+            throw new BusinessException(messageProvider.getMessage("exception.wallet.inconsistentLedger"));
+        }
+
+        wallet.setCurrentBalance(wallet.getCurrentBalance().subtract(refundAmount));
+        wallet.setTotalEarned(wallet.getTotalEarned().subtract(refundAmount));
+        wallet.setTotalRefunded(wallet.getTotalRefunded().add(refundAmount));
+        walletRepository.save(wallet);
+
+        WithdrawalRequestEntity refund = WithdrawalRequestEntity.builder()
+                .instructorId(instructorId)
+                .orderId(orderId)
+                .type(WithdrawalTypeEnum.REFUND)
+                .status(WithdrawalStatusEnum.COMPLETED)
+                .requestedAmount(refundAmount)
+                .commissionRate(BigDecimal.ZERO)
+                .commissionAmount(BigDecimal.ZERO)
+                .netAmount(refundAmount)
+                .reason("Refund adjustment for order: " + orderId)
+                .approvedAt(LocalDateTime.now())
+                .approvedBy(securityUtils.getCurrentUserId())
+                .completedAt(LocalDateTime.now())
+                .transactionId("REFUND-" + orderId.toString().replace("-", "").substring(0, 12)
+                        + "-" + instructorId.toString().replace("-", "").substring(0, 6))
+                .build();
+        withdrawalRepository.save(refund);
     }
 
     private BigDecimal calculateCommission(BigDecimal amount, BigDecimal rate) {
@@ -327,6 +409,10 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
             return BigDecimal.ZERO;
         }
         return amount.multiply(rate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }
 

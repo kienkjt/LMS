@@ -38,6 +38,10 @@ public class InstructorWalletEntity extends BaseEntity {
     @Builder.Default
     private BigDecimal totalCommissionDeducted = BigDecimal.ZERO;
 
+    @Column(name = "total_refunded", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal totalRefunded = BigDecimal.ZERO;
+
     @Version
     private Long version;
 }
