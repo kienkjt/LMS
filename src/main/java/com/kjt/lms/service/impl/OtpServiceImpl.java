@@ -32,14 +32,24 @@ public class OtpServiceImpl implements OtpService {
     @Value("${otp.reset-verified-ttl-seconds:300}")
     private long resetVerifiedTtlSeconds;
 
+    @Value("${otp.resend-cooldown-seconds:60}")
+    private long resendCooldownSeconds;
+
     private static final String OTP_PATTERN = "[0-9]{6}";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String RESET_VERIFIED_PREFIX = "PASSWORD_RESET_VERIFIED:";
+    private static final String RESEND_COOLDOWN_PREFIX = "OTP_RESEND_COOLDOWN:";
 
     @Override
     public void generateAndSaveOtp(String email, String purpose) {
 
-        String key = buildKey(email, purpose);
+        String normalizedEmail = normalizeEmail(email);
+        String key = buildKey(normalizedEmail, purpose);
+        String cooldownKey = resendCooldownKey(normalizedEmail, purpose);
+
+        if (otpRedisRepository.existsById(cooldownKey)) {
+            throw new BusinessException(messageProvider.getMessage("otp.rate_limit_exceeded"));
+        }
 
         // Generate OTP
         String otpCode = generateSecureOtp();
@@ -52,10 +62,16 @@ public class OtpServiceImpl implements OtpService {
                 .build();
 
         otpRedisRepository.save(otp);
+        otpRedisRepository.save(OtpRedis.builder()
+                .id(cooldownKey)
+                .otpCode("COOLDOWN")
+                .failedAttempts(0)
+                .expiration(resendCooldownSeconds)
+                .build());
 
-        log.info("OTP generated for email {} purpose {}", email, purpose);
+        log.info("OTP generated for email {} purpose {}", normalizedEmail, purpose);
 
-        emailService.sendOtpEmail(email, otpCode, purpose);
+        emailService.sendOtpEmail(normalizedEmail, otpCode, purpose);
     }
 
     @Override
@@ -65,7 +81,8 @@ public class OtpServiceImpl implements OtpService {
             throw new BusinessException(messageProvider.getMessage("auth.verifyOtp.invalid"));
         }
 
-        String key = buildKey(email, purpose);
+        String normalizedEmail = normalizeEmail(email);
+        String key = buildKey(normalizedEmail, purpose);
 
         Optional<OtpRedis> optionalOtp = otpRedisRepository.findById(key);
 
@@ -100,13 +117,15 @@ public class OtpServiceImpl implements OtpService {
         // Success -> delete OTP
         otpRedisRepository.deleteById(key);
 
-        log.info("OTP verified for email {} purpose {}", email, purpose);
+        otpRedisRepository.deleteById(resendCooldownKey(normalizedEmail, purpose));
+
+        log.info("OTP verified for email {} purpose {}", normalizedEmail, purpose);
     }
 
     @Override
     public void markPasswordResetVerified(String email) {
         OtpRedis resetVerified = OtpRedis.builder()
-                .id(resetVerifiedKey(email))
+                .id(resetVerifiedKey(normalizeEmail(email)))
                 .otpCode("VERIFIED")
                 .failedAttempts(0)
                 .expiration(resetVerifiedTtlSeconds)
@@ -117,7 +136,7 @@ public class OtpServiceImpl implements OtpService {
 
     @Override
     public void requirePasswordResetVerified(String email) {
-        OtpRedis verified = otpRedisRepository.findById(resetVerifiedKey(email))
+        OtpRedis verified = otpRedisRepository.findById(resetVerifiedKey(normalizeEmail(email)))
                 .orElseThrow(() -> new BusinessException(messageProvider.getMessage("auth.resetPassword.otpNotVerified")));
 
         if (!"VERIFIED".equals(verified.getOtpCode())) {
@@ -127,7 +146,7 @@ public class OtpServiceImpl implements OtpService {
 
     @Override
     public void clearPasswordResetVerified(String email) {
-        otpRedisRepository.deleteById(resetVerifiedKey(email));
+        otpRedisRepository.deleteById(resetVerifiedKey(normalizeEmail(email)));
     }
 
     private String generateSecureOtp() {
@@ -141,5 +160,13 @@ public class OtpServiceImpl implements OtpService {
 
     private String resetVerifiedKey(String email) {
         return RESET_VERIFIED_PREFIX + email;
+    }
+
+    private String resendCooldownKey(String email, String purpose) {
+        return RESEND_COOLDOWN_PREFIX + buildKey(email, purpose);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 }

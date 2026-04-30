@@ -266,6 +266,7 @@ public class CourseServiceImpl extends BaseService implements CourseService {
             }
 
             course.setThumbnail(uploadResponse.getSecureUrl());
+            course.setThumbnailPublicId(uploadResponse.getPublicId());
             CourseEntity updatedCourse = courseRepository.save(course);
 
             log.info("Course image uploaded: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
@@ -290,6 +291,7 @@ public class CourseServiceImpl extends BaseService implements CourseService {
             }
 
             course.setPreviewVideoUrl(uploadResponse.getSecureUrl());
+            course.setPreviewVideoPublicId(uploadResponse.getPublicId());
             CourseEntity updatedCourse = courseRepository.save(course);
 
             log.info("Course preview video uploaded: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
@@ -401,7 +403,7 @@ public class CourseServiceImpl extends BaseService implements CourseService {
         }
 
         UUID currentUserId = getCurrentUserIdIfAuthenticated();
-        if (currentUserId != null && course.getInstructorId().equals(currentUserId)) {
+        if (course.getInstructorId().equals(currentUserId)) {
             return course;
         }
 

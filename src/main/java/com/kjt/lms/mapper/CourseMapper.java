@@ -11,13 +11,14 @@ import com.kjt.lms.model.response.course.CourseDetailResponseDto;
 import com.kjt.lms.model.response.course.CourseListItemResponseDto;
 import com.kjt.lms.model.response.course.CourseUpdateResponseDto;
 import com.kjt.lms.model.response.lesson.LessonResponseDto;
+import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
 import java.util.UUID;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", builder = @Builder(disableBuilder = true))
 public interface CourseMapper {
 
     @Mapping(source = "createdAt", target = "createdAt")
@@ -26,11 +27,23 @@ public interface CourseMapper {
     @Mapping(source = "updatedById", target = "updatedById")
     CourseUpdateResponseDto toDto(CourseEntity entity);
 
+    @Mapping(target = "instructorName", ignore = true)
     CourseCreateResponseDto toCreateResponse(CourseEntity entity);
 
+    @Mapping(target = "instructorName", ignore = true)
     CourseListItemResponseDto toListItemDto(CourseEntity entity);
 
     @Mapping(target = "instructorId", source = "instructorId")
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "createdById", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedById", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deleted", ignore = true)
+    @Mapping(target = "thumbnailPublicId", ignore = true)
+    @Mapping(target = "previewVideoPublicId", ignore = true)
+    @Mapping(target = "thumbnail", ignore = true)
+    @Mapping(target = "previewVideoUrl", ignore = true)
     @Mapping(target = "status", expression = "java(com.kjt.lms.common.constants.CourseStatusEnum.DRAFT)")
     @Mapping(target = "totalLessons", constant = "0")
     @Mapping(target = "totalStudents", constant = "0")
@@ -49,10 +62,21 @@ public interface CourseMapper {
     @Mapping(target = "avgRating", ignore = true)
     @Mapping(target = "totalReviews", ignore = true)
     @Mapping(target = "active", ignore = true)
+    @Mapping(target = "createdById", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedById", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deleted", ignore = true)
+    @Mapping(target = "thumbnailPublicId", ignore = true)
+    @Mapping(target = "previewVideoPublicId", ignore = true)
+    @Mapping(target = "thumbnail", ignore = true)
+    @Mapping(target = "previewVideoUrl", ignore = true)
     @Mapping(target = "reviewedBy", ignore = true)
     @Mapping(target = "rejectReason", ignore = true)
     void updateCourseFromRequest(UpdateCourseRequestDto request, @MappingTarget CourseEntity course);
 
+    @Mapping(target = "instructorName", ignore = true)
+    @Mapping(target = "chapters", ignore = true)
     CourseDetailResponseDto toDetailDto(CourseEntity entity);
 
     @Mapping(target = "lessons", ignore = true)
