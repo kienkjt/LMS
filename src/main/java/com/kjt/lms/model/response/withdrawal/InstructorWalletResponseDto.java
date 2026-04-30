@@ -16,6 +16,7 @@ public class InstructorWalletResponseDto {
     private UUID id;
     private UUID instructorId;
     private BigDecimal currentBalance;
+    private BigDecimal pendingBalance;
     private BigDecimal availableBalance;
     private BigDecimal pendingWithdrawalAmount;
     private BigDecimal totalEarned;

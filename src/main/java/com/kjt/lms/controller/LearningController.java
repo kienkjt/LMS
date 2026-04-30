@@ -4,6 +4,7 @@ import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.model.response.enrollment.EnrolledCourseResponseDto;
 import com.kjt.lms.model.response.enrollment.EnrollmentResponseDto;
+import com.kjt.lms.model.response.enrollment.InstructorStudentEnrollmentResponseDto;
 import com.kjt.lms.model.response.progress.CourseProgressResponseDto;
 import com.kjt.lms.service.EnrollmentService;
 import com.kjt.lms.service.LessonProgressService;
@@ -13,6 +14,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -64,6 +67,19 @@ public class LearningController {
     public ResponseEntity<APIResponse<List<EnrolledCourseResponseDto>>> getMyEnrolledCourses() {
         List<EnrolledCourseResponseDto> response = enrollmentService.getMyEnrolledCourses();
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("enrollment.list.success")));
+    }
+
+    @GetMapping("/instructor/courses/{courseId}/students")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Get enrolled students for an instructor course", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<Page<InstructorStudentEnrollmentResponseDto>>> getStudentsByCourseForInstructor(
+            @PathVariable UUID courseId,
+            Pageable pageable) {
+        Page<InstructorStudentEnrollmentResponseDto> response = enrollmentService.getStudentsByCourseForInstructor(courseId, pageable);
+        return ResponseEntity.ok(APIResponse.success(
+                response,
+                messageProvider.getMessage("enrollment.list.success")
+        ));
     }
 }
 

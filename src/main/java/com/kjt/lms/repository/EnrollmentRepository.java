@@ -2,6 +2,9 @@ package com.kjt.lms.repository;
 
 import com.kjt.lms.model.entity.EnrollmentEntity;
 import com.kjt.lms.model.response.enrollment.EnrolledCourseResponseDto;
+import com.kjt.lms.model.response.enrollment.InstructorStudentEnrollmentResponseDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -37,4 +40,30 @@ public interface EnrollmentRepository extends JpaRepository<EnrollmentEntity, UU
     ORDER BY e.createdAt DESC
     """)
     List<EnrolledCourseResponseDto> findEnrolledCoursesByStudentId(@Param("studentId") UUID studentId);
+
+    @Query("""
+    SELECT new com.kjt.lms.model.response.enrollment.InstructorStudentEnrollmentResponseDto(
+        e.id,
+        e.courseId,
+        s.id,
+        s.fullName,
+        s.email,
+        s.avatar,
+        s.phoneNumber,
+        e.progressPercent,
+        e.createdAt,
+        e.completedAt
+    )
+    FROM EnrollmentEntity e
+    JOIN CourseEntity c ON c.id = e.courseId
+    JOIN UserEntity s ON s.id = e.studentId
+    WHERE e.courseId = :courseId
+      AND e.deleted = false
+      AND c.deleted = false
+    ORDER BY e.createdAt DESC
+    """)
+    Page<InstructorStudentEnrollmentResponseDto> findStudentsByCourseId(
+            @Param("courseId") UUID courseId,
+            Pageable pageable
+    );
 }

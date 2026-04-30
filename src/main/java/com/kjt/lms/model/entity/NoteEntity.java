@@ -14,7 +14,14 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "notes")
+@Table(
+        name = "notes",
+        indexes = {
+                @Index(name = "idx_note_student", columnList = "student_id"),
+                @Index(name = "idx_note_course", columnList = "course_id"),
+                @Index(name = "idx_note_lesson", columnList = "lesson_id")
+        }
+)
 public class NoteEntity extends BaseEntity {
 
     @Column(name = "student_id", nullable = false, length = 36)

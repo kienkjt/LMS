@@ -14,7 +14,16 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "wishlists")
+@Table(
+        name = "wishlists",
+        indexes = {
+                @Index(name = "idx_wishlist_student", columnList = "student_id"),
+                @Index(name = "idx_wishlist_course", columnList = "course_id")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_wishlist_student_course", columnNames = {"student_id", "course_id"})
+        }
+)
 public class WishlistEntity extends BaseEntity {
 
     @Column(name = "student_id", nullable = false, length = 36)

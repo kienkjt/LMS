@@ -12,8 +12,7 @@ import java.util.UUID;
 
 public interface WithdrawalService {
 
-
-    void addEarnings(UUID instructorId, BigDecimal amount);
+    void addEarnings(UUID instructorId, UUID orderId, BigDecimal amount);
 
     void deductBalance(UUID instructorId, BigDecimal amount);
 
@@ -36,6 +35,8 @@ public interface WithdrawalService {
     InstructorWalletResponseDto getInstructorWallet();
 
     void processRefundAdjustment(UUID orderId);
+
+    int releasePendingEarnings();
 
     Page<WithdrawalRequestResponseDto> getAllWithdrawals(Pageable pageable);
 

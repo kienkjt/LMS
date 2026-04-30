@@ -76,7 +76,7 @@ public class OrderController {
 
     @PostMapping("/{orderId}/refund")
     @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
-    @Operation(summary = "Refund a paid order", security = @SecurityRequirement(name = "Bearer"))
+    @Operation(summary = "Reject refund for an order", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<OrderResponseDto>> refundOrder(@PathVariable UUID orderId) {
         OrderResponseDto response = paymentService.refundOrder(orderId);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("payment.refunded.success")));

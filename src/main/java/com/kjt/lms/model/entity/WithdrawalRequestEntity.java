@@ -82,6 +82,9 @@ public class WithdrawalRequestEntity extends BaseEntity {
     @Column(name = "transaction_id", length = 100)
     private String transactionId;
 
+    @Column(name = "available_at")
+    private LocalDateTime availableAt;
+
     @Version
     private Long version;
 }

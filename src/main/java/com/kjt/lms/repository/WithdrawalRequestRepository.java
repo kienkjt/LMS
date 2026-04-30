@@ -11,7 +11,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,6 +41,19 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
             @Param("instructorId") UUID instructorId,
             @Param("type") WithdrawalTypeEnum type,
             @Param("statuses") Collection<WithdrawalStatusEnum> statuses
+    );
+
+    List<WithdrawalRequestEntity> findByTypeAndStatusAndAvailableAtLessThanEqualAndDeletedFalse(
+            WithdrawalTypeEnum type,
+            WithdrawalStatusEnum status,
+            LocalDateTime availableAt
+    );
+
+    List<WithdrawalRequestEntity> findByInstructorIdAndOrderIdAndTypeAndStatusAndDeletedFalse(
+            UUID instructorId,
+            UUID orderId,
+            WithdrawalTypeEnum type,
+            WithdrawalStatusEnum status
     );
 }
 

@@ -26,6 +26,10 @@ public class InstructorWalletEntity extends BaseEntity {
     @Builder.Default
     private BigDecimal currentBalance = BigDecimal.ZERO;
 
+    @Column(name = "pending_balance", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal pendingBalance = BigDecimal.ZERO;
+
     @Column(name = "total_earned", nullable = false, precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal totalEarned = BigDecimal.ZERO;

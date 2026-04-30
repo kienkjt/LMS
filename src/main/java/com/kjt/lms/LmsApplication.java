@@ -8,9 +8,11 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableAsync
+@EnableScheduling
 @EnableJpaRepositories(
         basePackages = "com.kjt.lms.repository",
         excludeFilters = @Filter(type = FilterType.ASSIGNABLE_TYPE, classes = OtpRedisRepository.class)

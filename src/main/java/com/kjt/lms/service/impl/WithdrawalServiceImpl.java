@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,9 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
     @Value("${app.withdrawal.commission-rate:10}")
     private BigDecimal defaultCommissionRate;
 
+    @Value("${app.withdrawal.settlement-delay-days:7}")
+    private long settlementDelayDays;
+
     private final InstructorWalletRepository walletRepository;
     private final WithdrawalRequestRepository withdrawalRepository;
     private final OrderItemRepository orderItemRepository;
@@ -55,18 +59,33 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
 
     @Override
     @Transactional
-    public void addEarnings(UUID instructorId, BigDecimal amount) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+    public void addEarnings(UUID instructorId, UUID orderId, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0 || orderId == null) {
             return;
         }
 
         InstructorWalletEntity wallet = getOrCreateWallet(instructorId);
+        LocalDateTime now = LocalDateTime.now();
 
-        wallet.setCurrentBalance(wallet.getCurrentBalance().add(amount));
+        wallet.setPendingBalance(wallet.getPendingBalance().add(amount));
         wallet.setTotalEarned(wallet.getTotalEarned().add(amount));
-
         walletRepository.save(wallet);
-        log.info("Added earnings {} to instructor {}", amount, instructorId);
+
+        WithdrawalRequestEntity settlement = WithdrawalRequestEntity.builder()
+                .instructorId(instructorId)
+                .orderId(orderId)
+                .type(WithdrawalTypeEnum.SETTLEMENT)
+                .status(WithdrawalStatusEnum.PENDING)
+                .requestedAmount(amount)
+                .commissionRate(BigDecimal.ZERO)
+                .commissionAmount(BigDecimal.ZERO)
+                .netAmount(amount)
+                .reason("Pending settlement for order: " + orderId)
+                .availableAt(now.plusDays(settlementDelayDays))
+                .build();
+        withdrawalRepository.save(settlement);
+
+        log.info("Added pending earnings {} for instructor {} and order {}", amount, instructorId, orderId);
     }
 
     @Override
@@ -255,14 +274,15 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
                     .orElseThrow(() -> new ResourceNotFoundException(
                             messageProvider.getMessage("exception.wallet.notFound")));
             wallet.setTotalWithdrawn(wallet.getTotalWithdrawn().add(zeroIfNull(entity.getNetAmount())));
-            wallet.setTotalCommissionDeducted(wallet.getTotalCommissionDeducted().add(zeroIfNull(entity.getCommissionAmount())));
+            wallet.setTotalCommissionDeducted(wallet.getTotalCommissionDeducted()
+                    .add(zeroIfNull(entity.getCommissionAmount())));
             walletRepository.save(wallet);
         }
 
         WithdrawalRequestEntity saved = withdrawalRepository.save(entity);
 
         log.info("Completed withdrawal request {} for instructor {} with transaction {}",
-                 requestId, entity.getInstructorId(), transactionId);
+                requestId, entity.getInstructorId(), transactionId);
 
         return withdrawalMapper.toResponse(saved);
     }
@@ -275,8 +295,10 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         BigDecimal pendingWithdrawalAmount = getPendingWithdrawalAmount(instructorId);
 
         InstructorWalletResponseDto response = withdrawalMapper.toWalletResponse(wallet);
-        response.setPendingWithdrawalAmount(pendingWithdrawalAmount);
+        response.setPendingBalance(wallet.getPendingBalance());
         response.setAvailableBalance(wallet.getCurrentBalance());
+        response.setCurrentBalance(wallet.getCurrentBalance().add(wallet.getPendingBalance()));
+        response.setPendingWithdrawalAmount(pendingWithdrawalAmount);
         return response;
     }
 
@@ -309,6 +331,43 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
     }
 
     @Override
+    @Transactional
+    @Scheduled(cron = "${app.withdrawal.settlement-release-cron:0 0 * * * *}")
+    public int releasePendingEarnings() {
+        List<WithdrawalRequestEntity> settlements =
+                withdrawalRepository.findByTypeAndStatusAndAvailableAtLessThanEqualAndDeletedFalse(
+                        WithdrawalTypeEnum.SETTLEMENT,
+                        WithdrawalStatusEnum.PENDING,
+                        LocalDateTime.now()
+                );
+
+        int releasedCount = 0;
+        for (WithdrawalRequestEntity settlement : settlements) {
+            InstructorWalletEntity wallet = getOrCreateWallet(settlement.getInstructorId());
+            BigDecimal amount = zeroIfNull(settlement.getRequestedAmount());
+
+            if (wallet.getPendingBalance().compareTo(amount) < 0) {
+                throw new BusinessException(messageProvider.getMessage("exception.wallet.inconsistentLedger"));
+            }
+
+            wallet.setPendingBalance(wallet.getPendingBalance().subtract(amount));
+            wallet.setCurrentBalance(wallet.getCurrentBalance().add(amount));
+            walletRepository.save(wallet);
+
+            settlement.setStatus(WithdrawalStatusEnum.COMPLETED);
+            settlement.setCompletedAt(LocalDateTime.now());
+            settlement.setNetAmount(amount);
+            withdrawalRepository.save(settlement);
+            releasedCount++;
+        }
+
+        if (releasedCount > 0) {
+            log.info("Released {} pending settlement entries", releasedCount);
+        }
+        return releasedCount;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Page<WithdrawalRequestResponseDto> getAllWithdrawals(Pageable pageable) {
         securityUtils.isAdmin();
@@ -328,6 +387,7 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         InstructorWalletEntity wallet = InstructorWalletEntity.builder()
                 .instructorId(instructorId)
                 .currentBalance(BigDecimal.ZERO)
+                .pendingBalance(BigDecimal.ZERO)
                 .totalEarned(BigDecimal.ZERO)
                 .totalWithdrawn(BigDecimal.ZERO)
                 .totalCommissionDeducted(BigDecimal.ZERO)
@@ -372,7 +432,11 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         }
 
         InstructorWalletEntity wallet = getOrCreateWallet(instructorId);
-        if (wallet.getCurrentBalance().compareTo(refundAmount) < 0) {
+
+        BigDecimal pendingToDeduct = refundAmount.min(wallet.getPendingBalance());
+        BigDecimal remainingRefund = refundAmount.subtract(pendingToDeduct);
+
+        if (wallet.getCurrentBalance().compareTo(remainingRefund) < 0) {
             throw new BusinessException(messageProvider.getMessage("exception.refund.walletInsufficientBalance"));
         }
 
@@ -380,10 +444,13 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
             throw new BusinessException(messageProvider.getMessage("exception.wallet.inconsistentLedger"));
         }
 
-        wallet.setCurrentBalance(wallet.getCurrentBalance().subtract(refundAmount));
+        wallet.setPendingBalance(wallet.getPendingBalance().subtract(pendingToDeduct));
+        wallet.setCurrentBalance(wallet.getCurrentBalance().subtract(remainingRefund));
         wallet.setTotalEarned(wallet.getTotalEarned().subtract(refundAmount));
         wallet.setTotalRefunded(wallet.getTotalRefunded().add(refundAmount));
         walletRepository.save(wallet);
+
+        settlePendingLedgerForRefund(orderId, instructorId, pendingToDeduct);
 
         WithdrawalRequestEntity refund = WithdrawalRequestEntity.builder()
                 .instructorId(instructorId)
@@ -404,15 +471,56 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         withdrawalRepository.save(refund);
     }
 
+    private void settlePendingLedgerForRefund(UUID orderId, UUID instructorId, BigDecimal pendingDeducted) {
+        if (pendingDeducted.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        List<WithdrawalRequestEntity> settlements =
+                withdrawalRepository.findByInstructorIdAndOrderIdAndTypeAndStatusAndDeletedFalse(
+                        instructorId,
+                        orderId,
+                        WithdrawalTypeEnum.SETTLEMENT,
+                        WithdrawalStatusEnum.PENDING
+                );
+
+        BigDecimal remaining = pendingDeducted;
+        for (WithdrawalRequestEntity settlement : settlements) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+
+            BigDecimal settlementAmount = zeroIfNull(settlement.getRequestedAmount());
+            if (settlementAmount.compareTo(remaining) > 0) {
+                settlement.setRequestedAmount(settlementAmount.subtract(remaining));
+                settlement.setNetAmount(settlementAmount.subtract(remaining));
+                withdrawalRepository.save(settlement);
+                remaining = BigDecimal.ZERO;
+                break;
+            }
+
+            settlement.setRequestedAmount(BigDecimal.ZERO);
+            settlement.setNetAmount(BigDecimal.ZERO);
+            settlement.setStatus(WithdrawalStatusEnum.CANCELLED);
+            settlement.setRejectedAt(LocalDateTime.now());
+            settlement.setRejectReason("Cancelled by refund for order: " + orderId);
+            withdrawalRepository.save(settlement);
+            remaining = remaining.subtract(settlementAmount);
+        }
+
+        if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+            throw new BusinessException(messageProvider.getMessage("exception.wallet.inconsistentLedger"));
+        }
+    }
+
     private BigDecimal calculateCommission(BigDecimal amount, BigDecimal rate) {
         if (amount == null || rate == null || rate.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
-        return amount.multiply(rate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        return amount.multiply(rate).divide(BigDecimal.valueOf(100), 1, RoundingMode.HALF_UP);
     }
 
     private BigDecimal zeroIfNull(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
 }
-

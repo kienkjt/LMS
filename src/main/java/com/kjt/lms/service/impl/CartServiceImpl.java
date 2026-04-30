@@ -33,6 +33,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class CartServiceImpl implements CartService {
 
     private final CartRepository cartRepository;

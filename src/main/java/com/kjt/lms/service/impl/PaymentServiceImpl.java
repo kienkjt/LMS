@@ -128,16 +128,19 @@ public class PaymentServiceImpl implements PaymentService {
 
         String txnRef = queryParams.get("vnp_TxnRef");
         String responseCode = queryParams.get("vnp_ResponseCode");
-        OrderEntity order = findOrderByTransactionId(txnRef);
+        String transactionStatus = queryParams.get("vnp_TransactionStatus");
+        OrderEntity order = findOrderByTransactionIdForUpdate(txnRef);
+        validateVnPayOrderData(queryParams, order);
 
-        if ("00".equals(responseCode)) {
+        if (isVnPaySuccess(responseCode, transactionStatus)) {
             if (order.getStatus() == OrderStatusEnum.PENDING) {
                 completePayment(order, PaymentMethodEnum.VNPAY, txnRef);
             }
             return mapToDto(order);
         }
 
-        log.warn("VNPay return failed for transaction {} with code {}", txnRef, responseCode);
+        log.warn("VNPay return failed for transaction {} with response code {} and transaction status {}",
+                txnRef, responseCode, transactionStatus);
         return mapToDto(order);
     }
 
@@ -148,9 +151,11 @@ public class PaymentServiceImpl implements PaymentService {
             validateVnPaySignature(queryParams);
             String txnRef = queryParams.get("vnp_TxnRef");
             String responseCode = queryParams.get("vnp_ResponseCode");
-            OrderEntity order = findOrderByTransactionId(txnRef);
+            String transactionStatus = queryParams.get("vnp_TransactionStatus");
+            OrderEntity order = findOrderByTransactionIdForUpdate(txnRef);
+            validateVnPayOrderData(queryParams, order);
 
-            if ("00".equals(responseCode) && order.getStatus() == OrderStatusEnum.PENDING) {
+            if (isVnPaySuccess(responseCode, transactionStatus) && order.getStatus() == OrderStatusEnum.PENDING) {
                 completePayment(order, PaymentMethodEnum.VNPAY, txnRef);
             }
 
@@ -158,7 +163,7 @@ public class PaymentServiceImpl implements PaymentService {
         } catch (ResourceNotFoundException ex) {
             return Map.of("RspCode", "01", "Message", "Order not found");
         } catch (BusinessException ex) {
-            return Map.of("RspCode", "02", "Message", "Invalid status");
+            return Map.of("RspCode", "04", "Message", ex.getMessage());
         } catch (Exception ex) {
             log.error("VNPay IPN processing error", ex);
             return Map.of("RspCode", "99", "Message", "Unknown error");
@@ -186,20 +191,8 @@ public class PaymentServiceImpl implements PaymentService {
     public OrderResponseDto refundOrder(UUID orderId) {
         OrderEntity order = getAccessibleOrder(orderId);
 
-        if (order.getStatus() != OrderStatusEnum.COMPLETED) {
-            throw new BusinessException(messageProvider.getMessage("exception.order.notRefundable"));
-        }
-
-        order.setStatus(OrderStatusEnum.REFUNDED);
-        revokeEnrollmentsByOrder(order);
-
-        // Reverse instructor earnings immediately and persist an audit record.
-        withdrawalService.processRefundAdjustment(orderId);
-
-        OrderEntity savedOrder = orderRepository.save(order);
-
-        log.info("Order {} refunded and instructor earnings reversed", orderId);
-        return mapToDto(savedOrder);
+        log.warn("Refund rejected for order {} with status {}", order.getId(), order.getStatus());
+        throw new BusinessException(messageProvider.getMessage("exception.order.notRefundable"));
     }
 
     private OrderResponseDto processMomo(OrderEntity order, String transactionId) {
@@ -218,7 +211,7 @@ public class PaymentServiceImpl implements PaymentService {
         List<OrderItemEntity> orderItems = orderItemRepository.findByOrderId(order.getId());
         for (OrderItemEntity item : orderItems) {
             if (item.getInstructorId() != null && item.getInstructorRevenue() != null) {
-                withdrawalService.addEarnings(item.getInstructorId(), item.getInstructorRevenue());
+                withdrawalService.addEarnings(item.getInstructorId(), order.getId(), item.getInstructorRevenue());
             }
         }
 
@@ -307,6 +300,22 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    private void validateVnPayOrderData(Map<String, String> queryParams, OrderEntity order) {
+        String tmnCode = queryParams.get("vnp_TmnCode");
+        if (tmnCode == null || !tmnCode.equals(vnPayConfig.getTmnCode())) {
+            throw new BusinessException(messageProvider.getMessage("exception.payment.vnpay.invalidResponse"));
+        }
+
+        String amount = queryParams.get("vnp_Amount");
+        if (amount == null || !amount.equals(String.valueOf(toVnPayAmount(order.getFinalAmount())))) {
+            throw new BusinessException(messageProvider.getMessage("exception.payment.vnpay.invalidAmount"));
+        }
+    }
+
+    private boolean isVnPaySuccess(String responseCode, String transactionStatus) {
+        return "00".equals(responseCode) && "00".equals(transactionStatus);
+    }
+
     private String buildEncodedParamString(Map<String, String> params) {
         List<String> pairs = new ArrayList<>();
         for (Map.Entry<String, String> entry : params.entrySet()) {
@@ -344,6 +353,11 @@ public class PaymentServiceImpl implements PaymentService {
 
     private OrderEntity findOrderByTransactionId(String txnRef) {
         return orderRepository.findByTransactionIdAndDeletedFalse(txnRef)
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.payment.transaction.notFound")));
+    }
+
+    private OrderEntity findOrderByTransactionIdForUpdate(String txnRef) {
+        return orderRepository.findWithLockByTransactionIdAndDeletedFalse(txnRef)
                 .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.payment.transaction.notFound")));
     }
 
@@ -397,18 +411,6 @@ public class PaymentServiceImpl implements PaymentService {
                     .build();
             enrollmentRepository.save(enrollment);
         }
-    }
-
-    private void revokeEnrollmentsByOrder(OrderEntity order) {
-        List<EnrollmentEntity> enrollments = enrollmentRepository
-                .findByStudentIdAndOrderIdAndDeletedFalse(order.getStudentId(), order.getId());
-
-        if (enrollments.isEmpty()) {
-            return;
-        }
-
-        enrollments.forEach(enrollment -> enrollment.setDeleted(true));
-        enrollmentRepository.saveAll(enrollments);
     }
 
     private OrderResponseDto mapToDto(OrderEntity order) {

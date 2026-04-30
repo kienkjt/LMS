@@ -1,6 +1,7 @@
 package com.kjt.lms.common.base;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,7 +23,6 @@ import java.util.UUID;
 public abstract class BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 36, nullable = false, updatable = false)
     private UUID id;
@@ -48,4 +48,15 @@ public abstract class BaseEntity {
 
     @Column(nullable = false)
     private Boolean deleted = false;
+
+    @PrePersist
+    public void prePersist() {
+        if (id == null) {
+            id = UuidCreator.getTimeOrderedEpoch();
+        }
+
+        if (deleted == null) {
+            deleted = false;
+        }
+    }
 }

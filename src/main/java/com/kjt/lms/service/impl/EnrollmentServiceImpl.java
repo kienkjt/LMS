@@ -9,11 +9,14 @@ import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.EnrollmentEntity;
 import com.kjt.lms.model.response.enrollment.EnrolledCourseResponseDto;
 import com.kjt.lms.model.response.enrollment.EnrollmentResponseDto;
+import com.kjt.lms.model.response.enrollment.InstructorStudentEnrollmentResponseDto;
 import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.OrderItemRepository;
 import com.kjt.lms.service.EnrollmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,5 +76,13 @@ public class EnrollmentServiceImpl extends BaseService implements EnrollmentServ
     public List<EnrolledCourseResponseDto> getMyEnrolledCourses() {
         UUID studentId = securityUtils.getCurrentUserId();
         return enrollmentRepository.findEnrolledCoursesByStudentId(studentId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<InstructorStudentEnrollmentResponseDto> getStudentsByCourseForInstructor(UUID courseId, Pageable pageable) {
+        CourseEntity course = findActiveCourseById(courseId);
+        validateCourseOwnership(course);
+        return enrollmentRepository.findStudentsByCourseId(courseId, pageable);
     }
 }

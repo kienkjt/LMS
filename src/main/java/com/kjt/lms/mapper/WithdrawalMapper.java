@@ -43,11 +43,17 @@ public class WithdrawalMapper {
             return null;
         }
 
+        java.math.BigDecimal currentBalance =
+                entity.getCurrentBalance() == null ? java.math.BigDecimal.ZERO : entity.getCurrentBalance();
+        java.math.BigDecimal pendingBalance =
+                entity.getPendingBalance() == null ? java.math.BigDecimal.ZERO : entity.getPendingBalance();
+
         return InstructorWalletResponseDto.builder()
                 .id(entity.getId())
                 .instructorId(entity.getInstructorId())
-                .currentBalance(entity.getCurrentBalance())
-                .availableBalance(entity.getCurrentBalance())
+                .currentBalance(currentBalance.add(pendingBalance))
+                .pendingBalance(pendingBalance)
+                .availableBalance(currentBalance)
                 .pendingWithdrawalAmount(java.math.BigDecimal.ZERO)
                 .totalEarned(entity.getTotalEarned())
                 .totalWithdrawn(entity.getTotalWithdrawn())

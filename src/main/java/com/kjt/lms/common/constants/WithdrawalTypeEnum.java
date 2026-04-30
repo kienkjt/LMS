@@ -7,8 +7,9 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum WithdrawalTypeEnum {
 
-    REFUND("1", "Hoàn tiền"),
-    EARNINGS("2", "Rút tiền kiếm được");
+    REFUND("1", "Hoan tien"),
+    EARNINGS("2", "Rut tien kiem duoc"),
+    SETTLEMENT("3", "Doi soat doanh thu cho giai ngan");
 
     private final String value;
     private final String description;
@@ -25,4 +26,3 @@ public enum WithdrawalTypeEnum {
         throw new IllegalArgumentException("Invalid WithdrawalType value: " + value);
     }
 }
-
