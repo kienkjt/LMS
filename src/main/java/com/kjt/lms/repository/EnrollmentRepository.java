@@ -18,6 +18,7 @@ import java.util.UUID;
 public interface EnrollmentRepository extends JpaRepository<EnrollmentEntity, UUID> {
     boolean existsByStudentIdAndCourseIdAndDeletedFalse(UUID studentId, UUID courseId);
     Optional<EnrollmentEntity> findByStudentIdAndCourseIdAndDeletedFalse(UUID studentId, UUID courseId);
+    Page<EnrollmentEntity> findByCourseIdAndDeletedFalseOrderByCreatedAtDesc(UUID courseId, Pageable pageable);
     List<EnrollmentEntity> findByStudentIdAndOrderIdAndDeletedFalse(UUID studentId, UUID orderId);
     List<EnrollmentEntity> findByStudentIdAndDeletedFalse(UUID studentId);
 

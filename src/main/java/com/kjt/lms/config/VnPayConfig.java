@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 public class VnPayConfig {
     private String paymentUrl;
     private String returnUrl;
+    private String frontendReturnUrl;
     private String tmnCode;
     private String hashSecret;
     private String version;

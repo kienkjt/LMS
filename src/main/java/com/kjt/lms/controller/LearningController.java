@@ -4,8 +4,8 @@ import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.model.response.enrollment.EnrolledCourseResponseDto;
 import com.kjt.lms.model.response.enrollment.EnrollmentResponseDto;
-import com.kjt.lms.model.response.enrollment.InstructorStudentEnrollmentResponseDto;
 import com.kjt.lms.model.response.progress.CourseProgressResponseDto;
+import com.kjt.lms.model.response.progress.StudentCourseProgressResponseDto;
 import com.kjt.lms.service.EnrollmentService;
 import com.kjt.lms.service.LessonProgressService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,11 +15,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -71,14 +71,31 @@ public class LearningController {
 
     @GetMapping("/instructor/courses/{courseId}/students")
     @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
-    @Operation(summary = "Get enrolled students for an instructor course", security = @SecurityRequirement(name = "Bearer"))
-    public ResponseEntity<APIResponse<Page<InstructorStudentEnrollmentResponseDto>>> getStudentsByCourseForInstructor(
+    @Operation(summary = "Get enrolled students progress for an instructor course", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<Page<StudentCourseProgressResponseDto>>> getCourseStudentsForInstructor(
             @PathVariable UUID courseId,
-            Pageable pageable) {
-        Page<InstructorStudentEnrollmentResponseDto> response = enrollmentService.getStudentsByCourseForInstructor(courseId, pageable);
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize) {
+
+        Page<StudentCourseProgressResponseDto> response =
+                lessonProgressService.getCourseStudentsProgress(courseId, page, pageSize);
+
         return ResponseEntity.ok(APIResponse.success(
                 response,
-                messageProvider.getMessage("enrollment.list.success")
+                messageProvider.getMessage("lesson.progress.list.success")
+        ));
+    }
+
+    @GetMapping("/instructor/courses/{courseId}/students/{studentId}/progress")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Track a student's detailed progress in an instructor course", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<StudentCourseProgressResponseDto>> getStudentCourseProgressForInstructor(
+            @PathVariable UUID courseId,
+            @PathVariable UUID studentId) {
+        StudentCourseProgressResponseDto response = lessonProgressService.getStudentCourseProgress(courseId, studentId);
+        return ResponseEntity.ok(APIResponse.success(
+                response,
+                messageProvider.getMessage("lesson.progress.detail.success")
         ));
     }
 }
