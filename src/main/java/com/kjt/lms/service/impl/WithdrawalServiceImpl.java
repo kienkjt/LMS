@@ -67,8 +67,14 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         InstructorWalletEntity wallet = getOrCreateWallet(instructorId);
         LocalDateTime now = LocalDateTime.now();
 
-        wallet.setPendingBalance(wallet.getPendingBalance().add(amount));
-        wallet.setTotalEarned(wallet.getTotalEarned().add(amount));
+        // Tính phí ngay lập tức khi thanh toán (Earn first → Fee deducted immediately)
+        BigDecimal commissionAmount = calculateCommission(amount, defaultCommissionRate);
+        BigDecimal netAmount = amount.subtract(commissionAmount);
+
+        // Thêm net amount (đã trừ phí) vào pendingBalance
+        wallet.setPendingBalance(wallet.getPendingBalance().add(netAmount));
+        wallet.setTotalEarned(wallet.getTotalEarned().add(netAmount));
+        wallet.setTotalCommissionDeducted(wallet.getTotalCommissionDeducted().add(commissionAmount));
         walletRepository.save(wallet);
 
         WithdrawalRequestEntity settlement = WithdrawalRequestEntity.builder()
@@ -76,16 +82,17 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
                 .orderId(orderId)
                 .type(WithdrawalTypeEnum.SETTLEMENT)
                 .status(WithdrawalStatusEnum.PENDING)
-                .requestedAmount(amount)
-                .commissionRate(BigDecimal.ZERO)
-                .commissionAmount(BigDecimal.ZERO)
-                .netAmount(amount)
+                .requestedAmount(netAmount)
+                .commissionRate(defaultCommissionRate)
+                .commissionAmount(commissionAmount)
+                .netAmount(netAmount)
                 .reason("Pending settlement for order: " + orderId)
                 .availableAt(now.plusDays(settlementDelayDays))
                 .build();
         withdrawalRepository.save(settlement);
 
-        log.info("Added pending earnings {} for instructor {} and order {}", amount, instructorId, orderId);
+        log.info("Added pending earnings {} (after commission {}) for instructor {} and order {}",
+                netAmount, commissionAmount, instructorId, orderId);
     }
 
     @Override
@@ -121,8 +128,9 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
             throw new BusinessException(messageProvider.getMessage("exception.wallet.insufficientBalance"));
         }
 
-        BigDecimal commissionAmount = calculateCommission(request.getRequestedAmount(), defaultCommissionRate);
-        BigDecimal netAmount = request.getRequestedAmount().subtract(commissionAmount);
+        // Phí đã được trừ ở addEarnings, rút tiền không trừ phí thêm
+        // Commission is already deducted at payment time
+        BigDecimal netAmount = request.getRequestedAmount();
 
         wallet.setCurrentBalance(wallet.getCurrentBalance().subtract(request.getRequestedAmount()));
         walletRepository.save(wallet);
@@ -132,8 +140,8 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
                 .type(WithdrawalTypeEnum.EARNINGS)
                 .status(WithdrawalStatusEnum.PENDING)
                 .requestedAmount(request.getRequestedAmount())
-                .commissionRate(defaultCommissionRate)
-                .commissionAmount(commissionAmount)
+                .commissionRate(BigDecimal.ZERO)
+                .commissionAmount(BigDecimal.ZERO)
                 .netAmount(netAmount)
                 .bankAccount(request.getBankAccount())
                 .bankName(request.getBankName())
@@ -273,9 +281,8 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
             InstructorWalletEntity wallet = walletRepository.findByInstructorIdAndDeletedFalse(entity.getInstructorId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             messageProvider.getMessage("exception.wallet.notFound")));
+            // Commission đã trừ ở addEarnings, chỉ cập nhật totalWithdrawn
             wallet.setTotalWithdrawn(wallet.getTotalWithdrawn().add(zeroIfNull(entity.getNetAmount())));
-            wallet.setTotalCommissionDeducted(wallet.getTotalCommissionDeducted()
-                    .add(zeroIfNull(entity.getCommissionAmount())));
             walletRepository.save(wallet);
         }
 
