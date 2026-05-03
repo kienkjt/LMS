@@ -55,12 +55,6 @@ public class UserEntity extends BaseEntity {
     @Column(name = "bio", columnDefinition = "TEXT")
     private String bio;
 
-    @Column(name = "provider", length = 50)
-    private String provider;
-
-    @Column(name = "provider_id", length = 200)
-    private String providerId;
-
     @Column(name = "total_revenue", precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal totalRevenue = BigDecimal.ZERO;
