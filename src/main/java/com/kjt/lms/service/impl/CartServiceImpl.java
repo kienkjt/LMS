@@ -47,7 +47,7 @@ public class CartServiceImpl implements CartService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
                 .map(BaseEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.user.notfound")));
     }
 
     private CartEntity getOrCreateCart(UUID userId) {
@@ -119,7 +119,7 @@ public class CartServiceImpl implements CartService {
         CartEntity cart = getOrCreateCart(userId);
 
         CartItemEntity item = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.cart.itemNotFound")));
 
         if (!item.getCartId().equals(cart.getId())) {
             throw new BusinessException(messageProvider.getMessage("exception.cart.notBelongs"));
@@ -169,7 +169,7 @@ public class CartServiceImpl implements CartService {
 
             String instructorName = userRepository.findById(course.getInstructorId())
                     .map(UserEntity::getFullName)
-                    .orElse("Unknown");
+                    .orElse(messageProvider.getMessage("common.unknown"));
 
             return cartMapper.toItemResponse(item, course, instructorName);
         }).filter(Objects::nonNull).toList();

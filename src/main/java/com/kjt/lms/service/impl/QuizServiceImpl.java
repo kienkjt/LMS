@@ -179,12 +179,12 @@ public class QuizServiceImpl extends BaseService implements QuizService {
 
         List<QuestionEntity> questions = questionRepository.findByQuizIdAndDeletedFalseOrderByCreatedAtAsc(quizId);
         if (questions.isEmpty()) {
-            throw new BusinessException("Quiz has no questions");
+            throw new BusinessException(messageProvider.getMessage("exception.quiz.noQuestions"));
         }
 
         long previousAttempts = quizAttemptRepository.countByStudentIdAndQuizIdAndDeletedFalse(studentId, quizId);
         if (quiz.getMaxAttempts() != null && quiz.getMaxAttempts() > 0 && previousAttempts >= quiz.getMaxAttempts()) {
-            throw new BusinessException("Maximum quiz attempts reached");
+            throw new BusinessException(messageProvider.getMessage("exception.quiz.maxAttempts"));
         }
 
         Map<UUID, QuestionEntity> questionById = questions.stream()
@@ -211,7 +211,7 @@ public class QuizServiceImpl extends BaseService implements QuizService {
 
         for (Map.Entry<UUID, String> submitted : submittedAnswerByQuestionId.entrySet()) {
             if (!questionById.containsKey(submitted.getKey())) {
-                throw new BusinessException("Submitted question does not belong to this quiz");
+                throw new BusinessException(messageProvider.getMessage("exception.quiz.question.notInQuiz"));
             }
         }
 
@@ -264,12 +264,12 @@ public class QuizServiceImpl extends BaseService implements QuizService {
 
     private QuizEntity findQuiz(UUID quizId) {
         return quizRepository.findByIdAndDeletedFalse(quizId)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.quiz.notFound")));
     }
 
     private QuestionEntity findQuestion(UUID questionId) {
         return questionRepository.findByIdAndDeletedFalse(questionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.quiz.question.notFound")));
     }
 
     private void validateLessonBelongsToCourse(UUID lessonId, UUID courseId) {
@@ -307,7 +307,7 @@ public class QuizServiceImpl extends BaseService implements QuizService {
     private void validateStudentCanTakeQuiz(UUID studentId, QuizEntity quiz) {
         CourseEntity course = findActiveCourseById(quiz.getCourseId());
         if (course.getInstructorId().equals(studentId)) {
-            throw new BusinessException("Instructor cannot submit quiz attempts for own course");
+            throw new BusinessException(messageProvider.getMessage("exception.quiz.instructorCannotAttempt"));
         }
         if (!securityUtils.isAdmin()
                 && !enrollmentRepository.existsByStudentIdAndCourseIdAndDeletedFalse(studentId, quiz.getCourseId())) {

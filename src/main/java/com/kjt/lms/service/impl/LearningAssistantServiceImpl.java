@@ -2,6 +2,7 @@ package com.kjt.lms.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.model.request.ai.LearningAssistantPromptRequestDto;
 import com.kjt.lms.model.response.ai.LearningAssistantPromptResponseDto;
@@ -61,6 +62,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             """;
 
     private final ObjectMapper objectMapper;
+    private final MessageProvider messageProvider;
 
     @Value("${gemini.api-key:}")
     private String geminiApiKey;
@@ -96,7 +98,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
     private String callGemini(String prompt) {
         String apiKey = normalize(geminiApiKey);
         if (apiKey.isEmpty()) {
-            throw new BusinessException("Thieu cau hinh GEMINI_API_KEY.");
+            throw new BusinessException(messageProvider.getMessage("exception.ai.missingApiKey"));
         }
 
         try {
@@ -123,7 +125,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log.error("Gemini API failed with status {} and body {}", response.statusCode(), response.body());
-                throw new BusinessException("Khong the lay phan hoi tu AI luc nay.");
+                throw new BusinessException(messageProvider.getMessage("exception.ai.unavailable"));
             }
 
             return extractAnswer(response.body());
@@ -132,10 +134,10 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             log.error("Gemini API call interrupted", ex);
-            throw new BusinessException("Khong the lay phan hoi tu AI luc nay.");
+            throw new BusinessException(messageProvider.getMessage("exception.ai.unavailable"));
         } catch (IOException ex) {
             log.error("Gemini API call failed", ex);
-            throw new BusinessException("Khong the lay phan hoi tu AI luc nay.");
+            throw new BusinessException(messageProvider.getMessage("exception.ai.unavailable"));
         }
     }
 
@@ -167,7 +169,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             }
         }
 
-        throw new BusinessException("AI khong tra ve noi dung phu hop.");
+        throw new BusinessException(messageProvider.getMessage("exception.ai.invalidResponse"));
     }
 
     private String normalize(String value) {

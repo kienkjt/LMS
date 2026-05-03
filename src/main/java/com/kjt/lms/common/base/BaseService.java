@@ -1,5 +1,6 @@
 package com.kjt.lms.common.base;
 
+import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.security.SecurityUtils;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
@@ -23,11 +24,14 @@ public abstract class BaseService {
     @Autowired
     protected UserRepository userRepository;
 
+    @Autowired
+    protected MessageProvider messageProvider;
+
     protected CourseEntity findActiveCourseById(UUID courseId) {
         CourseEntity course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound")));
         if (Boolean.TRUE.equals(course.getDeleted())) {
-            throw new ResourceNotFoundException("Course has been deleted: " + courseId);
+            throw new ResourceNotFoundException(messageProvider.getMessage("exception.course.deleted"));
         }
         return course;
     }
@@ -38,7 +42,7 @@ public abstract class BaseService {
         }
         UUID currentUserId = securityUtils.getCurrentUserId();
         if (!course.getInstructorId().equals(currentUserId)) {
-            throw new BusinessException("You are not the owner of this course");
+            throw new BusinessException(messageProvider.getMessage("exception.course.notOwner"));
         }
     }
 

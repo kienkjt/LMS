@@ -1,5 +1,6 @@
 package com.kjt.lms.common.security;
 
+import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.ResourceNotFoundException;
 import com.kjt.lms.model.entity.UserEntity;
 import com.kjt.lms.repository.UserRepository;
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class SecurityUtils {
 
     private final UserRepository userRepository;
+    private final MessageProvider messageProvider;
 
     /**
      * Lấy UUID của người dùng hiện tại từ SecurityContext
@@ -27,13 +29,14 @@ public class SecurityUtils {
         if (authentication == null || !authentication.isAuthenticated()
                 || "anonymousUser".equals(authentication.getPrincipal())) {
             log.error("Attempt to get current user ID while unauthenticated");
-            throw new ResourceNotFoundException("User not authenticated");
+            throw new ResourceNotFoundException(messageProvider.getMessage("exception.auth.unauthenticated"));
         }
 
         String email = authentication.getName();
         return userRepository.findByEmail(email)
                 .map(UserEntity::getId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.user.notfoundWithEmail", email)));
     }
 
     /**

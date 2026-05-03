@@ -194,6 +194,7 @@ public class CertificateServiceImpl extends BaseService implements CertificateSe
     }
 
     private CertificateResponseDto toResponse(CertificateEntity certificate) {
+        String certificateDownloadUrl = "/api/v1/certificates/" + certificate.getId() + "/download";
         return CertificateResponseDto.builder()
                 .id(certificate.getId())
                 .userId(certificate.getUserId())
@@ -203,7 +204,7 @@ public class CertificateServiceImpl extends BaseService implements CertificateSe
                 .studentName(certificate.getStudentName())
                 .courseTitle(certificate.getCourseTitle())
                 .instructorName(certificate.getInstructorName())
-                .certificateUrl(certificate.getCertificateUrl())
+                .certificateUrl(certificateDownloadUrl)
                 .issuedAt(certificate.getIssuedAt())
                 .build();
     }

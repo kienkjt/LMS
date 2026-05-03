@@ -42,7 +42,7 @@ public class NotificationServiceImpl extends BaseService implements Notification
     public NotificationResponseDto markAsRead(UUID notificationId) {
         UUID userId = securityUtils.getCurrentUserId();
         NotificationEntity notification = notificationRepository.findByIdAndUserIdAndDeletedFalse(notificationId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.notification.notFound")));
 
         if (!Boolean.TRUE.equals(notification.getRead())) {
             notification.setRead(true);
