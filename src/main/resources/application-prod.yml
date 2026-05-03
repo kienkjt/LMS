@@ -78,3 +78,9 @@ app:
       allowed-content-types: ${MEDIA_COURSE_VIDEO_ALLOWED_CONTENT_TYPES:video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/x-flv,video/webm}
   certificate:
     storage-dir: ${CERTIFICATE_STORAGE_DIR:certificates}
+
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-1.5-flash}
+  base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+  timeout-seconds: ${GEMINI_TIMEOUT_SECONDS:60}

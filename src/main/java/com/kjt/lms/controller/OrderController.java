@@ -40,8 +40,11 @@ public class OrderController {
     @PostMapping("/checkout")
     @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
     @Operation(summary = "Checkout current cart", security = @SecurityRequirement(name = "Bearer"))
-    public ResponseEntity<APIResponse<OrderResponseDto>> checkout(@Valid @RequestBody CheckoutRequestDto request) {
+    public ResponseEntity<APIResponse<OrderResponseDto>> checkout(
+            @Valid @RequestBody CheckoutRequestDto request,
+            HttpServletRequest httpRequest) {
         OrderResponseDto response = orderService.checkoutCart(request);
+        response = initGatewayPaymentIfNeeded(response, request, httpRequest);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("order.checkout.success")));
     }
 
@@ -50,8 +53,10 @@ public class OrderController {
     @Operation(summary = "Checkout a course directly without using cart", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<OrderResponseDto>> checkoutCourse(
             @PathVariable UUID courseId,
-            @Valid @RequestBody CheckoutRequestDto request) {
+            @Valid @RequestBody CheckoutRequestDto request,
+            HttpServletRequest httpRequest) {
         OrderResponseDto response = orderService.checkoutCourse(courseId, request);
+        response = initGatewayPaymentIfNeeded(response, request, httpRequest);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("order.checkout.success")));
     }
 
@@ -64,6 +69,21 @@ public class OrderController {
             HttpServletRequest httpRequest) {
         OrderResponseDto response = paymentService.initPayment(orderId, request, httpRequest);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("payment.init.success")));
+    }
+
+    private OrderResponseDto initGatewayPaymentIfNeeded(OrderResponseDto response, CheckoutRequestDto request, HttpServletRequest httpRequest) {
+        if (response == null || response.getId() == null || request == null || request.getPaymentMethod() == null) {
+            return response;
+        }
+
+        InitPaymentRequestDto initRequest = new InitPaymentRequestDto();
+        initRequest.setPaymentMethod(request.getPaymentMethod());
+
+        try {
+            return paymentService.initPayment(response.getId(), initRequest, httpRequest);
+        } catch (Exception ex) {
+            return response;
+        }
     }
 
     @PostMapping("/{orderId}/pay")
