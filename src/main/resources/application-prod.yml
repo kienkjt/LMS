@@ -76,3 +76,5 @@ app:
     course-video:
       max-size-bytes: ${MEDIA_COURSE_VIDEO_MAX_SIZE_BYTES:5368709120}
       allowed-content-types: ${MEDIA_COURSE_VIDEO_ALLOWED_CONTENT_TYPES:video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/x-flv,video/webm}
+  certificate:
+    storage-dir: ${CERTIFICATE_STORAGE_DIR:certificates}

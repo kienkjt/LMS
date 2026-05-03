@@ -2,6 +2,7 @@ package com.kjt.lms.service.impl;
 
 import com.kjt.lms.common.constants.OrderStatusEnum;
 import com.kjt.lms.common.constants.PaymentMethodEnum;
+import com.kjt.lms.common.constants.NotificationTypeEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.security.SecurityUtils;
 import com.kjt.lms.config.VnPayConfig;
@@ -17,6 +18,7 @@ import com.kjt.lms.model.response.order.OrderResponseDto;
 import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.OrderItemRepository;
 import com.kjt.lms.repository.OrderRepository;
+import com.kjt.lms.service.NotificationService;
 import com.kjt.lms.service.PaymentService;
 import com.kjt.lms.service.WithdrawalService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,6 +59,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final OrderMapper orderMapper;
     private final VnPayConfig vnPayConfig;
     private final WithdrawalService withdrawalService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -207,11 +210,27 @@ public class PaymentServiceImpl implements PaymentService {
 
         OrderEntity savedOrder = orderRepository.save(order);
         createEnrollmentsForOrder(savedOrder);
+        notificationService.notifyUser(
+                order.getStudentId(),
+                NotificationTypeEnum.PAYMENT_SUCCESS,
+                "Payment successful",
+                "Your order " + order.getOrderCode() + " has been paid successfully.",
+                order.getId(),
+                "ORDER"
+        );
 
         List<OrderItemEntity> orderItems = orderItemRepository.findByOrderId(order.getId());
         for (OrderItemEntity item : orderItems) {
             if (item.getInstructorId() != null && item.getInstructorRevenue() != null) {
                 withdrawalService.addEarnings(item.getInstructorId(), order.getId(), item.getInstructorRevenue());
+                notificationService.notifyUser(
+                        item.getInstructorId(),
+                        NotificationTypeEnum.NEW_ENROLLMENT,
+                        "New student enrollment",
+                        "A student enrolled in \"" + item.getCourseTitle() + "\".",
+                        item.getCourseId(),
+                        "COURSE"
+                );
             }
         }
 

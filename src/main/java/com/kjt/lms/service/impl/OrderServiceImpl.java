@@ -86,30 +86,37 @@ public class OrderServiceImpl extends BaseService implements OrderService {
             CourseEntity course = courseRepository.findById(cartItem.getCourseId())
                     .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound")));
 
-            if (Boolean.TRUE.equals(course.getDeleted())
-                    || course.getActive() != CommonStatusEnum.ACTIVE
-                    || (course.getStatus() != CourseStatusEnum.PUBLISHED && course.getStatus() != CourseStatusEnum.APPROVED)) {
-                throw new BusinessException(messageProvider.getMessage("exception.enrollment.course.notAvailable"));
-            }
-
-            if (enrollmentRepository.existsByStudentIdAndCourseIdAndDeletedFalse(userId, course.getId())) {
-                throw new BusinessException(messageProvider.getMessage("exception.enrollment.alreadyEnrolled", course.getTitle()));
-            }
-
-            OrderItemEntity orderItem = OrderItemEntity.builder()
-                    .orderId(order.getId())
-                    .courseId(course.getId())
-                    .courseTitle(course.getTitle())
-                    .courseThumbnail(course.getThumbnail())
-                    .originalPrice(course.getPrice())
-                    .paidPrice(cartItem.getPrice())
-                    .instructorId(course.getInstructorId())
-                    .instructorRevenue(cartItem.getPrice().multiply(INSTRUCTOR_REVENUE_RATE))
-                    .build();
-            orderItemRepository.save(orderItem);
+            validatePurchasableCourse(course, userId);
+            createOrderItem(order.getId(), course, cartItem.getPrice());
         }
 
         cartService.clearCart();
+        return mapToDto(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponseDto checkoutCourse(UUID courseId, CheckoutRequestDto request) {
+        UUID userId = securityUtils.getCurrentUserId();
+        CourseEntity course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.course.notFound")));
+
+        validatePurchasableCourse(course, userId);
+
+        BigDecimal paidPrice = getActualCoursePrice(course);
+        OrderEntity order = OrderEntity.builder()
+                .studentId(userId)
+                .orderCode(generateOrderCode())
+                .totalAmount(paidPrice)
+                .discountAmount(BigDecimal.ZERO)
+                .finalAmount(paidPrice)
+                .status(OrderStatusEnum.PENDING)
+                .paymentMethod(request.getPaymentMethod())
+                .note(request.getNote())
+                .build();
+
+        order = orderRepository.save(order);
+        createOrderItem(order.getId(), course, paidPrice);
         return mapToDto(order);
     }
 
@@ -140,5 +147,41 @@ public class OrderServiceImpl extends BaseService implements OrderService {
     private OrderResponseDto mapToDto(OrderEntity order) {
         List<OrderItemEntity> items = orderItemRepository.findByOrderId(order.getId());
         return orderMapper.toResponse(order, items);
+    }
+
+    private void validatePurchasableCourse(CourseEntity course, UUID userId) {
+        if (Boolean.TRUE.equals(course.getDeleted())
+                || course.getActive() != CommonStatusEnum.ACTIVE
+                || (course.getStatus() != CourseStatusEnum.PUBLISHED && course.getStatus() != CourseStatusEnum.APPROVED)) {
+            throw new BusinessException(messageProvider.getMessage("exception.enrollment.course.notAvailable"));
+        }
+
+        if (course.getInstructorId().equals(userId)) {
+            throw new BusinessException(messageProvider.getMessage("exception.cart.ownCourse"));
+        }
+
+        if (enrollmentRepository.existsByStudentIdAndCourseIdAndDeletedFalse(userId, course.getId())) {
+            throw new BusinessException(messageProvider.getMessage("exception.enrollment.alreadyEnrolled", course.getTitle()));
+        }
+    }
+
+    private BigDecimal getActualCoursePrice(CourseEntity course) {
+        return course.getDiscountPrice() != null && course.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0
+                ? course.getDiscountPrice()
+                : course.getPrice();
+    }
+
+    private void createOrderItem(UUID orderId, CourseEntity course, BigDecimal paidPrice) {
+        OrderItemEntity orderItem = OrderItemEntity.builder()
+                .orderId(orderId)
+                .courseId(course.getId())
+                .courseTitle(course.getTitle())
+                .courseThumbnail(course.getThumbnail())
+                .originalPrice(course.getPrice())
+                .paidPrice(paidPrice)
+                .instructorId(course.getInstructorId())
+                .instructorRevenue(paidPrice.multiply(INSTRUCTOR_REVENUE_RATE))
+                .build();
+        orderItemRepository.save(orderItem);
     }
 }

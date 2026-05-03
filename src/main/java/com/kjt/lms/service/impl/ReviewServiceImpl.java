@@ -2,6 +2,7 @@ package com.kjt.lms.service.impl;
 
 import com.kjt.lms.common.base.BaseService;
 import com.kjt.lms.common.constants.CommonStatusEnum;
+import com.kjt.lms.common.constants.NotificationTypeEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
@@ -14,6 +15,7 @@ import com.kjt.lms.model.request.review.UpdateReviewRequestDto;
 import com.kjt.lms.model.response.review.ReviewResponseDto;
 import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.ReviewRepository;
+import com.kjt.lms.service.NotificationService;
 import com.kjt.lms.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class ReviewServiceImpl extends BaseService implements ReviewService {
     private final ReviewRepository reviewRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final MessageProvider messageProvider;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -83,6 +86,14 @@ public class ReviewServiceImpl extends BaseService implements ReviewService {
 
         ReviewEntity savedReview = reviewRepository.save(review);
         refreshCourseReviewStats(course);
+        notificationService.notifyUser(
+                course.getInstructorId(),
+                NotificationTypeEnum.NEW_REVIEW,
+                "New course review",
+                "Your course \"" + course.getTitle() + "\" received a new review.",
+                savedReview.getId(),
+                "REVIEW"
+        );
         log.info("Student {} reviewed course {}", studentId, courseId);
         return toResponse(savedReview);
     }

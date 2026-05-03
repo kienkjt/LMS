@@ -45,6 +45,16 @@ public class OrderController {
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("order.checkout.success")));
     }
 
+    @PostMapping("/checkout/courses/{courseId}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Checkout a course directly without using cart", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<OrderResponseDto>> checkoutCourse(
+            @PathVariable UUID courseId,
+            @Valid @RequestBody CheckoutRequestDto request) {
+        OrderResponseDto response = orderService.checkoutCourse(courseId, request);
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("order.checkout.success")));
+    }
+
     @PostMapping("/{orderId}/pay/init")
     @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
     @Operation(summary = "Init payment URL for an existing order", security = @SecurityRequirement(name = "Bearer"))

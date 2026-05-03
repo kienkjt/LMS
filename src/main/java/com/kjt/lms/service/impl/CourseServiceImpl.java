@@ -3,6 +3,7 @@ package com.kjt.lms.service.impl;
 import com.kjt.lms.common.base.BaseService;
 import com.kjt.lms.common.constants.CommonStatusEnum;
 import com.kjt.lms.common.constants.CourseStatusEnum;
+import com.kjt.lms.common.constants.NotificationTypeEnum;
 import com.kjt.lms.common.constants.YesNoEnum;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
@@ -28,6 +29,7 @@ import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonRepository;
 import com.kjt.lms.service.CourseService;
 import com.kjt.lms.service.MediaStorageService;
+import com.kjt.lms.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -59,6 +61,7 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     private final MessageProvider messageProvider;
     private final MediaStorageService mediaStorageService;
     private final EnrollmentRepository enrollmentRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -225,6 +228,14 @@ public class CourseServiceImpl extends BaseService implements CourseService {
 
         course.setStatus(CourseStatusEnum.APPROVED);
         CourseEntity updatedCourse = courseRepository.save(course);
+        notificationService.notifyUser(
+                course.getInstructorId(),
+                NotificationTypeEnum.COURSE_APPROVED,
+                "Course approved",
+                "Your course \"" + course.getTitle() + "\" has been approved.",
+                course.getId(),
+                "COURSE"
+        );
 
         log.info("Course approved: {}", courseId);
 
@@ -247,6 +258,14 @@ public class CourseServiceImpl extends BaseService implements CourseService {
         course.setStatus(CourseStatusEnum.REJECTED);
         course.setRejectReason(reason);
         CourseEntity updatedCourse = courseRepository.save(course);
+        notificationService.notifyUser(
+                course.getInstructorId(),
+                NotificationTypeEnum.COURSE_REJECTED,
+                "Course rejected",
+                "Your course \"" + course.getTitle() + "\" was rejected. Reason: " + reason,
+                course.getId(),
+                "COURSE"
+        );
 
         log.info("Course rejected: {} with reason: {}", courseId, reason);
 

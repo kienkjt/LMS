@@ -9,12 +9,14 @@ import com.kjt.lms.model.entity.EnrollmentEntity;
 import com.kjt.lms.model.entity.LessonEntity;
 import com.kjt.lms.model.entity.LessonProgressEntity;
 import com.kjt.lms.model.entity.UserEntity;
+import com.kjt.lms.model.response.certificate.CertificateResponseDto;
 import com.kjt.lms.model.response.progress.CourseProgressResponseDto;
 import com.kjt.lms.model.response.progress.LessonProgressDetailResponseDto;
 import com.kjt.lms.model.response.progress.StudentCourseProgressResponseDto;
 import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonProgressRepository;
 import com.kjt.lms.repository.LessonRepository;
+import com.kjt.lms.service.CertificateService;
 import com.kjt.lms.service.LessonProgressService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ public class LessonProgressServiceImpl extends BaseService implements LessonProg
     private final EnrollmentRepository enrollmentRepository;
     private final LessonRepository lessonRepository;
     private final LessonProgressRepository lessonProgressRepository;
+    private final CertificateService certificateService;
     private final MessageProvider messageProvider;
 
     @Override
@@ -83,6 +86,7 @@ public class LessonProgressServiceImpl extends BaseService implements LessonProg
         }
 
         enrollmentRepository.save(enrollment);
+        certificateService.issueCertificateIfEligible(enrollment);
         return progress;
     }
 

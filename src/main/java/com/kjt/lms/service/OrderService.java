@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public interface OrderService {
     OrderResponseDto checkoutCart(CheckoutRequestDto request);
+    OrderResponseDto checkoutCourse(UUID courseId, CheckoutRequestDto request);
     OrderResponseDto getOrderById(UUID orderId);
     List<OrderResponseDto> getMyOrders(int page, int size);
 }

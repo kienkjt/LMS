@@ -3,11 +3,13 @@ package com.kjt.lms.controller;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.response.APIResponse;
 import com.kjt.lms.common.validator.Common;
+import com.kjt.lms.model.request.cart.AddToCartRequestDto;
 import com.kjt.lms.model.response.wishlist.WishlistResponseDto;
 import com.kjt.lms.service.WishlistService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,10 +29,10 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/wishlist")
+@RequestMapping({"/api/v1/wishlist", "/api/v1/wishlists"})
 @RequiredArgsConstructor
 @Tag(name = "Wishlist", description = "Student wishlist management")
-@PreAuthorize("hasRole('STUDENT')")
+@PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR', 'ADMIN')")
 public class WishlistController {
 
     private final WishlistService wishlistService;
@@ -39,10 +42,23 @@ public class WishlistController {
     @Operation(summary = "Get current student's wishlist", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<Page<WishlistResponseDto>>> getMyWishlist(
             @RequestParam(value = "page", defaultValue = Common.PAGE_DEFAULT) Integer page,
-            @RequestParam(value = "pageSize", defaultValue = Common.PAGE_SIZE_DEFAULT) Integer pageSize) {
-        Pageable pageable = PageRequest.of(page - 1, pageSize);
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
+            @RequestParam(value = "size", required = false) Integer size) {
+        int requestedPageSize = pageSize != null ? pageSize : (size != null ? size : Integer.parseInt(Common.PAGE_SIZE_DEFAULT));
+        if (requestedPageSize <= 0) {
+            requestedPageSize = Integer.parseInt(Common.PAGE_SIZE_DEFAULT);
+        }
+        int pageIndex = page == null || page <= 0 ? 0 : page - 1;
+        Pageable pageable = PageRequest.of(pageIndex, requestedPageSize);
         Page<WishlistResponseDto> response = wishlistService.getMyWishlist(pageable);
         return ResponseEntity.ok(APIResponse.success(response, null));
+    }
+
+    @PostMapping
+    @Operation(summary = "Add a course to wishlist by request body", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<WishlistResponseDto>> addToWishlist(@Valid @RequestBody AddToCartRequestDto request) {
+        WishlistResponseDto response = wishlistService.addToWishlist(request.getCourseId());
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("wishlist.add.success")));
     }
 
     @PostMapping("/courses/{courseId}")

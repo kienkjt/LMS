@@ -110,3 +110,5 @@ app:
     course-video:
       max-size-bytes: 5368709120
       allowed-content-types: video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/x-flv
+  certificate:
+    storage-dir: certificates

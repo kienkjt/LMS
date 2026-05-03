@@ -284,4 +284,12 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
               AND u.id = c.instructorId
             """)
     Optional<String> findInstructorNameByCourseId(@Param("courseId") UUID courseId);
+
+    long countByDeletedFalse();
+
+    long countByInstructorIdAndDeletedFalse(UUID instructorId);
+
+    long countByStatusAndDeletedFalse(CourseStatusEnum status);
+
+    long countByInstructorIdAndStatusAndDeletedFalse(UUID instructorId, CourseStatusEnum status);
 }
