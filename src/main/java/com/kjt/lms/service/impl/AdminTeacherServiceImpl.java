@@ -1,7 +1,6 @@
 package com.kjt.lms.service.impl;
 
 import com.kjt.lms.common.base.BaseService;
-import com.kjt.lms.common.constants.CommonStatusEnum;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
 import com.kjt.lms.model.entity.RoleEntity;
@@ -42,10 +41,10 @@ public class AdminTeacherServiceImpl extends BaseService implements AdminTeacher
     @Override
     @Transactional(readOnly = true)
     public Page<UserListResponse> listTeachers(ListUserRequest request) {
-        // Set role filter to TEACHER
+        // Set role filter to INSTRUCTOR (teacher role in database)
         ListUserRequest teacherRequest = ListUserRequest.builder()
                 .keyword(request.getKeyword())
-                .roleCode("TEACHER")
+                .roleCode("INSTRUCTOR")
                 .active(request.getActive())
                 .isLocked(request.getIsLocked())
                 .page(request.getPage())
@@ -78,11 +77,11 @@ public class AdminTeacherServiceImpl extends BaseService implements AdminTeacher
                     messageProvider.getMessage("exception.user.notfound"));
         }
 
-        // Verify user is a teacher
+        // Verify user is a teacher (INSTRUCTOR role)
         RoleEntity role = roleRepository.findById(teacher.getRoleId())
                 .orElseThrow(() -> new BusinessException("Vai trò không tìm thấy"));
 
-        if (!"TEACHER".equals(role.getCode())) {
+        if (!"INSTRUCTOR".equals(role.getCode())) {
             throw new BusinessException("Người dùng này không phải là giáo viên");
         }
 
@@ -120,10 +119,18 @@ public class AdminTeacherServiceImpl extends BaseService implements AdminTeacher
             // Filter by deleted status
             predicates.add(criteriaBuilder.equal(root.get("deleted"), false));
 
-            // Filter by TEACHER role
-            if ("INSTRUCTOR".equals(request.getRoleCode())) {
-                var roleJoin = root.join("roleId");
-                predicates.add(criteriaBuilder.equal(roleJoin.get("code"), "INSTRUCTOR"));
+            // Filter by TEACHER role - MUST be applied
+            String roleCode = request.getRoleCode();
+            if (roleCode != null && !roleCode.isEmpty()) {
+                RoleEntity roleEntity = roleRepository.findByCode(roleCode).orElse(null);
+                if (roleEntity != null) {
+                    log.info("Filtering by role: {} with ID: {}", roleCode, roleEntity.getId());
+                    predicates.add(criteriaBuilder.equal(root.get("roleId"), roleEntity.getId()));
+                } else {
+                    log.warn("Role not found: {}", roleCode);
+                    // If role doesn't exist, return empty result
+                    predicates.add(criteriaBuilder.equal(root.get("roleId"), UUID.randomUUID()));
+                }
             }
 
             // Search by keyword (name, email, phone)

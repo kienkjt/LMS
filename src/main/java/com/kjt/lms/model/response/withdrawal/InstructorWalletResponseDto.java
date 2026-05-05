@@ -18,6 +18,7 @@ public class InstructorWalletResponseDto {
     private BigDecimal currentBalance;
     private BigDecimal pendingBalance;
     private BigDecimal availableBalance;
+    private BigDecimal totalBalance;
     private BigDecimal pendingWithdrawalAmount;
     private BigDecimal totalEarned;
     private BigDecimal totalWithdrawn;

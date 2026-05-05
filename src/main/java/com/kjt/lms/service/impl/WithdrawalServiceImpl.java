@@ -304,7 +304,8 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         InstructorWalletResponseDto response = withdrawalMapper.toWalletResponse(wallet);
         response.setPendingBalance(wallet.getPendingBalance());
         response.setAvailableBalance(wallet.getCurrentBalance());
-        response.setCurrentBalance(wallet.getCurrentBalance().add(wallet.getPendingBalance()));
+        response.setCurrentBalance(wallet.getCurrentBalance());
+        response.setTotalBalance(wallet.getCurrentBalance().add(wallet.getPendingBalance()));
         response.setPendingWithdrawalAmount(pendingWithdrawalAmount);
         return response;
     }
