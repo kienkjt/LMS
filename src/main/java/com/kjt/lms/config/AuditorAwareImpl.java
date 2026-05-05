@@ -1,6 +1,7 @@
 package com.kjt.lms.config;
 
 import org.springframework.data.domain.AuditorAware;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -9,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
+@EnableJpaAuditing
 public class AuditorAwareImpl implements AuditorAware<UUID> {
 
     @Override

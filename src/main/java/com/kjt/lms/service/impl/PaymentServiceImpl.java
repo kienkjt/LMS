@@ -213,8 +213,8 @@ public class PaymentServiceImpl implements PaymentService {
         notificationService.notifyUser(
                 order.getStudentId(),
                 NotificationTypeEnum.PAYMENT_SUCCESS,
-                "Payment successful",
-                "Your order " + order.getOrderCode() + " has been paid successfully.",
+                messageProvider.getMessage("notification.payment.success.title"),
+                messageProvider.getMessage("notification.payment.success.message", order.getOrderCode()),
                 order.getId(),
                 "ORDER"
         );
@@ -226,8 +226,8 @@ public class PaymentServiceImpl implements PaymentService {
                 notificationService.notifyUser(
                         item.getInstructorId(),
                         NotificationTypeEnum.NEW_ENROLLMENT,
-                        "New student enrollment",
-                        "A student enrolled in \"" + item.getCourseTitle() + "\".",
+                        messageProvider.getMessage("notification.new.enrollment.title"),
+                        messageProvider.getMessage("notification.new.enrollment.message", item.getCourseTitle()),
                         item.getCourseId(),
                         "COURSE"
                 );

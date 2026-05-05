@@ -45,6 +45,7 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
             LEFT JOIN UserEntity u ON u.id = c.instructorId
             WHERE c.instructorId = :instructorId
               AND c.deleted = false
+            ORDER BY COALESCE(c.updatedAt, c.createdAt) DESC, c.createdAt DESC
             """)
     Page<CourseListItemResponseDto> findInstructorCoursesWithInstructorName(
             @Param("instructorId") UUID instructorId,
@@ -79,6 +80,7 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
                   AND c.status IN :statuses
                   AND c.active = :active
                   AND c.deleted = false
+                ORDER BY COALESCE(c.updatedAt, c.createdAt) DESC, c.createdAt DESC
             """)
     Page<CourseListItemResponseDto> findCoursesByCategoryWithInstructorName(
             @Param("categoryId") UUID categoryId,
@@ -114,7 +116,7 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
             AND (:courseLevel IS NULL OR c.level = :courseLevel)
             AND (:active IS NULL OR c.active = :active)
             AND c.deleted = false
-        order by c.id desc
+        ORDER BY COALESCE(c.updatedAt, c.createdAt) DESC, c.createdAt DESC
     """)
     Page<CourseListItemResponseDto> searchWithInstructorName(
             @Param("keyword") String keyword,
@@ -149,7 +151,7 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
             AND c.status IN :statuses
             AND c.active = :active
             AND c.deleted = false
-        ORDER BY c.createdAt DESC
+        ORDER BY COALESCE(c.updatedAt, c.createdAt) DESC, c.createdAt DESC
     """)
     Page<CourseListItemResponseDto> searchPublicWithInstructorName(
             @Param("keyword") String keyword,
@@ -185,7 +187,7 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
             AND (:active IS NULL OR c.active = :active)
             AND (:instructorId IS NULL OR c.instructorId = :instructorId)
             AND c.deleted = false
-        ORDER BY c.createdAt DESC
+        ORDER BY COALESCE(c.updatedAt, c.createdAt) DESC, c.createdAt DESC
     """)
     Page<CourseListItemResponseDto> searchManagedWithInstructorName(
             @Param("keyword") String keyword,

@@ -14,7 +14,9 @@ import com.kjt.lms.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,11 +55,22 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional(readOnly = true)
     public Page<CategoryResponseDto> getCategories(String keyword, Pageable pageable) {
+        Pageable sortedPageable = pageable.getSort().isSorted()
+                ? pageable
+                : PageRequest.of(
+                        pageable.getPageNumber(),
+                        pageable.getPageSize(),
+                        Sort.by(
+                                Sort.Order.desc("updatedAt"),
+                                Sort.Order.desc("createdAt")
+                        )
+                );
+
         if (keyword == null || keyword.isBlank()) {
-            return categoryRepository.findByDeletedFalse(pageable).map(categoryMapper::toDto);
+            return categoryRepository.findByDeletedFalse(sortedPageable).map(categoryMapper::toDto);
         }
 
-        return categoryRepository.search(keyword.trim(), pageable).map(categoryMapper::toDto);
+        return categoryRepository.search(keyword.trim(), sortedPageable).map(categoryMapper::toDto);
     }
 
     @Override

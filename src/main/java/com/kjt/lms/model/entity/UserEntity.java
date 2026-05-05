@@ -67,4 +67,8 @@ public class UserEntity extends BaseEntity {
     @Convert(converter = CommonStatusEnumConverter.class)
     @Builder.Default
     private CommonStatusEnum active = CommonStatusEnum.ACTIVE;
+
+    @Column(name = "is_locked", nullable = false)
+    @Builder.Default
+    private Boolean isLocked = false;
 }

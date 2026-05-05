@@ -84,19 +84,26 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async
     public void sendPasswordResetEmail(String email, String fullName) {
+        // ...existing code...
+    }
+
+    @Override
+    @Async
+    public void sendAccountLockedEmail(String email, String fullName, String reason) {
         try {
             Context context = new Context();
             context.setVariable("fullName", fullName);
+            context.setVariable("reason", reason != null ? reason : "Không có lý do được cung cấp");
             context.setVariable("appName", appName);
 
-            String htmlContent = templateEngine.process("emails/password-reset-success", context);
+            String htmlContent = templateEngine.process("emails/account-locked", context);
 
-            sendHtmlEmail(email, "Đặt lại mật khẩu thành công - " + appName, htmlContent);
+            sendHtmlEmail(email, "Tài khoản của bạn đã bị khóa - " + appName, htmlContent);
 
-            log.info("Đã gửi email thông báo đặt lại mật khẩu tới: {}", email);
+            log.info("Đã gửi email thông báo khóa tài khoản tới: {}", email);
 
         } catch (Exception e) {
-            log.error("Không thể gửi email thông báo đặt lại mật khẩu tới: {}", email, e);
+            log.error("Không thể gửi email thông báo khóa tài khoản tới: {}", email, e);
         }
     }
 

@@ -261,8 +261,8 @@ public class CourseServiceImpl extends BaseService implements CourseService {
         notificationService.notifyUser(
                 course.getInstructorId(),
                 NotificationTypeEnum.COURSE_REJECTED,
-                "Course rejected",
-                "Your course \"" + course.getTitle() + "\" was rejected. Reason: " + reason,
+                messageProvider.getMessage("notification.course.rejected.title"),
+                messageProvider.getMessage("notification.course.rejected.message", course.getTitle(), reason),
                 course.getId(),
                 "COURSE"
         );

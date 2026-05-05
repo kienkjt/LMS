@@ -29,7 +29,7 @@ public interface CategoryRepository extends JpaRepository<CategoryEntity, UUID> 
       AND (
             LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
       )
-    order by c.id desc
+    ORDER BY COALESCE(c.updatedAt, c.createdAt) DESC, c.createdAt DESC
     """)
     Page<CategoryEntity> search(@Param("keyword") String keyword, Pageable pageable);
 }

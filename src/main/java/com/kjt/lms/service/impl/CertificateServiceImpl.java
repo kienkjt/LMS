@@ -145,8 +145,8 @@ public class CertificateServiceImpl extends BaseService implements CertificateSe
         notificationService.notifyUser(
                 student.getId(),
                 NotificationTypeEnum.CERTIFICATE_ISSUED,
-                "Certificate issued",
-                "Your certificate for \"" + course.getTitle() + "\" is ready.",
+                messageProvider.getMessage("notification.certificate.issued.title"),
+                messageProvider.getMessage("notification.certificate.issued.message", course.getTitle()),
                 certificate.getId(),
                 "CERTIFICATE"
         );

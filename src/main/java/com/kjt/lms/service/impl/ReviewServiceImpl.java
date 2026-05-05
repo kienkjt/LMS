@@ -89,8 +89,8 @@ public class ReviewServiceImpl extends BaseService implements ReviewService {
         notificationService.notifyUser(
                 course.getInstructorId(),
                 NotificationTypeEnum.NEW_REVIEW,
-                "New course review",
-                "Your course \"" + course.getTitle() + "\" received a new review.",
+                messageProvider.getMessage("notification.review.received.title"),
+                messageProvider.getMessage("notification.review.received.message", course.getTitle()),
                 savedReview.getId(),
                 "REVIEW"
         );
