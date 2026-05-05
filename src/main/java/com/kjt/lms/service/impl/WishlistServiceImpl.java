@@ -28,7 +28,7 @@ import java.util.UUID;
 public class WishlistServiceImpl extends BaseService implements WishlistService {
 
     private static final Set<CourseStatusEnum> WISHLIST_VISIBLE_STATUSES =
-            Set.of(CourseStatusEnum.PUBLISHED, CourseStatusEnum.APPROVED);
+            Set.of(CourseStatusEnum.PUBLISHED);
 
     private final WishlistRepository wishlistRepository;
     private final MessageProvider messageProvider;

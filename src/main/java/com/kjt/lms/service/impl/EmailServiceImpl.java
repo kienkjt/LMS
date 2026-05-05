@@ -107,6 +107,24 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
+    @Override
+    @Async
+    public void sendSystemNotificationEmail(String email, String fullName, String subject, String message) {
+        try {
+            String safeName = fullName == null || fullName.isBlank() ? "Giảng viên" : fullName;
+            String htmlContent = """
+                    <html><body style="font-family:Arial,sans-serif;color:#111827;">
+                      <p>Xin chào %s,</p>
+                      <p>%s</p>
+                      <p>Trân trọng,<br/>%s</p>
+                    </body></html>
+                    """.formatted(safeName, message, appName);
+            sendHtmlEmail(email, subject, htmlContent);
+        } catch (Exception e) {
+            log.error("Khong the gui email thong bao he thong toi: {}", email, e);
+        }
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");

@@ -41,7 +41,7 @@ public class EnrollmentServiceImpl extends BaseService implements EnrollmentServ
 
         CourseEntity course = findActiveCourseById(courseId);
 
-        if (course.getStatus() != CourseStatusEnum.APPROVED) {
+        if (course.getStatus() != CourseStatusEnum.PUBLISHED) {
             throw new BusinessException(messageProvider.getMessage("exception.enrollment.course.notAvailable"));
         }
 

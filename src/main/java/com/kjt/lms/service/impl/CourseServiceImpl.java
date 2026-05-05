@@ -51,7 +51,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CourseServiceImpl extends BaseService implements CourseService {
 
-    private static final Set<CourseStatusEnum> PUBLIC_VISIBLE_STATUSES = Set.of(CourseStatusEnum.PUBLISHED, CourseStatusEnum.APPROVED);
+    private static final Set<CourseStatusEnum> PUBLIC_VISIBLE_STATUSES = Set.of(CourseStatusEnum.PUBLISHED);
 
     private final CourseRepository courseRepository;
     private final CategoryRepository categoryRepository;
@@ -172,14 +172,13 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     @Transactional
     public CourseUpdateResponseDto publishCourse(UUID courseId) {
         CourseEntity course = getOwnedCourse(courseId);
+        CourseStatusEnum nextStatus = resolveNextPublishStatus(course.getStatus());
 
-        validateCoursePublishableState(course);
-
-        log.info("Publishing course: {} (from {} to PUBLISHED)", courseId, course.getStatus());
-        course.setStatus(CourseStatusEnum.PUBLISHED);
+        log.info("Updating course visibility workflow: {} (from {} to {})", courseId, course.getStatus(), nextStatus);
+        course.setStatus(nextStatus);
         CourseEntity updatedCourse = courseRepository.save(course);
 
-        log.info("Course published: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
+        log.info("Course workflow updated: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
         return courseMapper.toDto(updatedCourse);
     }
 
@@ -193,8 +192,8 @@ public class CourseServiceImpl extends BaseService implements CourseService {
                     String.format("Cannot unpublish course in %s status", course.getStatus()));
         }
 
-        log.info("Unpublishing course: {} (from PUBLISHED to DRAFT)", courseId);
-        course.setStatus(CourseStatusEnum.DRAFT);
+        log.info("Unpublishing course: {} (from PUBLISHED to APPROVED)", courseId);
+        course.setStatus(CourseStatusEnum.APPROVED);
         CourseEntity updatedCourse = courseRepository.save(course);
 
         log.info("Course unpublished: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
@@ -219,10 +218,9 @@ public class CourseServiceImpl extends BaseService implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        // State machine: only PUBLISHED can be approved
-        if (course.getStatus() != CourseStatusEnum.PUBLISHED) {
+        if (course.getStatus() != CourseStatusEnum.PENDING_REVIEW) {
             throw new BusinessException(
-                    String.format("Cannot approve course in %s status. Only PUBLISHED courses can be approved.",
+                    String.format("Cannot approve course in %s status. Only PENDING_REVIEW courses can be approved.",
                             course.getStatus()));
         }
 
@@ -249,9 +247,9 @@ public class CourseServiceImpl extends BaseService implements CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.course.notFound")));
 
-        if (course.getStatus() != CourseStatusEnum.PUBLISHED) {
+        if (course.getStatus() != CourseStatusEnum.PENDING_REVIEW) {
             throw new BusinessException(
-                    String.format("Cannot reject course in %s status. Only PUBLISHED courses can be rejected.",
+                    String.format("Cannot reject course in %s status. Only PENDING_REVIEW courses can be rejected.",
                             course.getStatus()));
         }
 
@@ -434,16 +432,18 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     }
 
 
-    private void validateCoursePublishableState(CourseEntity course) {
-        if (!isPublishableStatus(course.getStatus())) {
-            throw new BusinessException(
-                    String.format("Cannot publish course in %s status. Only DRAFT or REJECTED can be published.",
-                            course.getStatus()));
+    private CourseStatusEnum resolveNextPublishStatus(CourseStatusEnum currentStatus) {
+        if (currentStatus == CourseStatusEnum.DRAFT || currentStatus == CourseStatusEnum.REJECTED) {
+            return CourseStatusEnum.PENDING_REVIEW;
         }
-    }
+        if (currentStatus == CourseStatusEnum.APPROVED) {
+            return CourseStatusEnum.PUBLISHED;
+        }
 
-    private boolean isPublishableStatus(CourseStatusEnum status) {
-        return status == CourseStatusEnum.DRAFT || status == CourseStatusEnum.REJECTED;
+        throw new BusinessException(
+                String.format(
+                        "Cannot move course from %s by publish action. Only DRAFT/REJECTED can be submitted for review and APPROVED can be published.",
+                        currentStatus));
     }
 
     private boolean isPubliclyVisible(CourseEntity course) {

@@ -5,5 +5,6 @@ public interface EmailService {
     void sendWelcomeEmail(String email, String fullName);
     void sendPasswordResetEmail(String email, String fullName);
     void sendAccountLockedEmail(String email, String fullName, String reason);
+    void sendSystemNotificationEmail(String email, String fullName, String subject, String message);
 }
 

@@ -22,6 +22,7 @@ import com.kjt.lms.repository.OrderItemRepository;
 import com.kjt.lms.repository.OrderRepository;
 import com.kjt.lms.service.CartService;
 import com.kjt.lms.service.OrderService;
+import com.kjt.lms.service.PlatformFeeService;
 import com.kjt.lms.mapper.OrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,8 +42,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class OrderServiceImpl extends BaseService implements OrderService {
 
-    private static final BigDecimal INSTRUCTOR_REVENUE_RATE = new BigDecimal("0.8");
-
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
@@ -50,6 +49,7 @@ public class OrderServiceImpl extends BaseService implements OrderService {
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CartService cartService;
+    private final PlatformFeeService platformFeeService;
     private final OrderMapper orderMapper;
     private final MessageProvider messageProvider;
 
@@ -152,7 +152,7 @@ public class OrderServiceImpl extends BaseService implements OrderService {
     private void validatePurchasableCourse(CourseEntity course, UUID userId) {
         if (Boolean.TRUE.equals(course.getDeleted())
                 || course.getActive() != CommonStatusEnum.ACTIVE
-                || (course.getStatus() != CourseStatusEnum.PUBLISHED && course.getStatus() != CourseStatusEnum.APPROVED)) {
+                || course.getStatus() != CourseStatusEnum.PUBLISHED) {
             throw new BusinessException(messageProvider.getMessage("exception.enrollment.course.notAvailable"));
         }
 
@@ -180,7 +180,7 @@ public class OrderServiceImpl extends BaseService implements OrderService {
                 .originalPrice(course.getPrice())
                 .paidPrice(paidPrice)
                 .instructorId(course.getInstructorId())
-                .instructorRevenue(paidPrice.multiply(INSTRUCTOR_REVENUE_RATE))
+                .instructorRevenue(paidPrice.multiply(platformFeeService.getInstructorRevenueRate()))
                 .build();
         orderItemRepository.save(orderItem);
     }

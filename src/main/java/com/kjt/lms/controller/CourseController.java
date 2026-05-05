@@ -140,7 +140,7 @@ public class CourseController {
     public ResponseEntity<APIResponse<CourseUpdateResponseDto>> publishCourse(
             @PathVariable UUID courseId) {
         CourseUpdateResponseDto response = courseService.publishCourse(courseId);
-        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.published.success")));
+        return ResponseEntity.ok(APIResponse.success(response, resolvePublishMessage(response)));
     }
 
     @PostMapping("/{courseId}/unpublish")
@@ -210,5 +210,13 @@ public class CourseController {
             @RequestParam("file") MultipartFile file) {
         CourseUpdateResponseDto response = courseService.uploadCoursePreviewVideo(courseId, file);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("course.preview.video.upload.success")));
+    }
+
+    private String resolvePublishMessage(CourseUpdateResponseDto response) {
+        return switch (response.getStatus()) {
+            case PENDING_REVIEW -> messageProvider.getMessage("course.submitted.success");
+            case PUBLISHED -> messageProvider.getMessage("course.published.success");
+            default -> messageProvider.getMessage("course.updated.success");
+        };
     }
 }

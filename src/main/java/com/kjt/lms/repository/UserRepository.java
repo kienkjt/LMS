@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,4 +28,14 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
               AND r.deleted = false
             """)
     long countByRoleCode(@Param("roleCode") String roleCode);
+
+    @Query("""
+            SELECT u
+            FROM UserEntity u, RoleEntity r
+            WHERE u.roleId = r.id
+              AND r.code = 'INSTRUCTOR'
+              AND u.deleted = false
+              AND r.deleted = false
+            """)
+    List<UserEntity> findAllInstructors();
 }
