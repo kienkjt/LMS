@@ -112,4 +112,11 @@ public interface EnrollmentRepository extends JpaRepository<EnrollmentEntity, UU
             @Param("courseId") UUID courseId,
             Pageable pageable
     );
+
+    @Query("""
+    SELECT DISTINCT e.studentId
+    FROM EnrollmentEntity e
+    WHERE e.deleted = false
+    """)
+    List<UUID> findDistinctActiveStudentIds();
 }

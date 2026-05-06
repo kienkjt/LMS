@@ -36,4 +36,16 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttemptEntity, 
               )
             """)
     long countUnpassedCourseQuizzes(@Param("studentId") UUID studentId, @Param("courseId") UUID courseId);
+
+    @Query("""
+            SELECT FUNCTION('DATE', qa.submittedAt) AS learningDate,
+                   COUNT(qa) AS activityCount,
+                   COALESCE(SUM(COALESCE(qa.timeSpent, 0)), 0) AS estimatedMinutes
+            FROM QuizAttemptEntity qa
+            WHERE qa.deleted = false
+              AND qa.studentId = :studentId
+              AND qa.submittedAt IS NOT NULL
+            GROUP BY FUNCTION('DATE', qa.submittedAt)
+            """)
+    List<Object[]> summarizeDailyLearningByStudent(@Param("studentId") UUID studentId);
 }

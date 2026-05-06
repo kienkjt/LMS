@@ -22,13 +22,7 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(
-        name = "lesson_progress",
-        indexes = {
-                @Index(name = "idx_lesson_progress_student_course", columnList = "student_id, course_id"),
-                @Index(name = "idx_lesson_progress_student_lesson", columnList = "student_id, lesson_id", unique = true)
-        }
-)
+@Table(name = "lesson_progress")
 public class LessonProgressEntity extends BaseEntity {
 
     @Column(name = "student_id", nullable = false, length = 36)

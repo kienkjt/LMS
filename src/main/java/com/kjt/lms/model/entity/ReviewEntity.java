@@ -17,16 +17,7 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(
-        name = "reviews",
-        indexes = {
-                @Index(name = "idx_review_course", columnList = "course_id"),
-                @Index(name = "idx_review_student", columnList = "student_id")
-        },
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_review_student_course", columnNames = {"student_id", "course_id"})
-        }
-)
+@Table(name = "reviews")
 public class ReviewEntity extends BaseEntity {
 
     @Column(name = "student_id", nullable = false, length = 36)

@@ -57,7 +57,7 @@ public class QuizController {
             @PathVariable UUID courseId,
             @Valid @RequestBody CreateQuizRequestDto request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(APIResponse.success(quizService.createQuiz(courseId, request), "Tao quiz thanh cong"));
+                .body(APIResponse.success(quizService.createQuiz(courseId, request), messageProvider.getMessage("quiz.created.success")));
     }
 
     @GetMapping("/courses/{courseId}/quizzes")
@@ -80,7 +80,7 @@ public class QuizController {
     public ResponseEntity<APIResponse<QuizResponseDto>> updateQuiz(
             @PathVariable UUID quizId,
             @Valid @RequestBody UpdateQuizRequestDto request) {
-        return ResponseEntity.ok(APIResponse.success(quizService.updateQuiz(quizId, request), "Cap nhat quiz thanh cong"));
+        return ResponseEntity.ok(APIResponse.success(quizService.updateQuiz(quizId, request), messageProvider.getMessage("quiz.updated.success")));
     }
 
     @DeleteMapping("/quizzes/{quizId}")
@@ -88,7 +88,7 @@ public class QuizController {
     @Operation(summary = "Delete quiz", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<Void>> deleteQuiz(@PathVariable UUID quizId) {
         quizService.deleteQuiz(quizId);
-        return ResponseEntity.ok(APIResponse.success(null, "Xoa quiz thanh cong"));
+        return ResponseEntity.ok(APIResponse.success(null, messageProvider.getMessage("quiz.deleted.success")));
     }
 
     @PostMapping("/quizzes/{quizId}/questions")
@@ -98,7 +98,7 @@ public class QuizController {
             @PathVariable UUID quizId,
             @Valid @RequestBody CreateQuestionRequestDto request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(APIResponse.success(quizService.addQuestion(quizId, request), "Tao cau hoi thanh cong"));
+                .body(APIResponse.success(quizService.addQuestion(quizId, request), messageProvider.getMessage("quiz.question.created.success")));
     }
 
     @PutMapping("/quizzes/questions/{questionId}")
@@ -107,7 +107,7 @@ public class QuizController {
     public ResponseEntity<APIResponse<QuestionResponseDto>> updateQuestion(
             @PathVariable UUID questionId,
             @Valid @RequestBody UpdateQuestionRequestDto request) {
-        return ResponseEntity.ok(APIResponse.success(quizService.updateQuestion(questionId, request), "Cap nhat cau hoi thanh cong"));
+        return ResponseEntity.ok(APIResponse.success(quizService.updateQuestion(questionId, request), messageProvider.getMessage("quiz.question.updated.success")));
     }
 
     @DeleteMapping("/quizzes/questions/{questionId}")
@@ -115,7 +115,7 @@ public class QuizController {
     @Operation(summary = "Delete question", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<Void>> deleteQuestion(@PathVariable UUID questionId) {
         quizService.deleteQuestion(questionId);
-        return ResponseEntity.ok(APIResponse.success(null, "Xoa cau hoi thanh cong"));
+        return ResponseEntity.ok(APIResponse.success(null, messageProvider.getMessage("quiz.question.deleted.success")));
     }
 
     @PostMapping("/quizzes/{quizId}/attempts")
@@ -124,7 +124,7 @@ public class QuizController {
     public ResponseEntity<APIResponse<QuizAttemptResponseDto>> submitAttempt(
             @PathVariable UUID quizId,
             @Valid @RequestBody SubmitQuizRequestDto request) {
-        return ResponseEntity.ok(APIResponse.success(quizService.submitAttempt(quizId, request), "Nop bai quiz thanh cong"));
+        return ResponseEntity.ok(APIResponse.success(quizService.submitAttempt(quizId, request), messageProvider.getMessage("quiz.attempt.submitted.success")));
     }
 
     @GetMapping("/quizzes/{quizId}/attempts/my")

@@ -8,6 +8,9 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface NoteRepository extends JpaRepository<NoteEntity, UUID> {
@@ -24,4 +27,15 @@ public interface NoteRepository extends JpaRepository<NoteEntity, UUID> {
             Pageable pageable);
 
     Optional<NoteEntity> findByIdAndStudentIdAndDeletedFalse(UUID id, UUID studentId);
+
+    @Query("""
+            SELECT FUNCTION('DATE', n.createdAt) AS learningDate,
+                   COUNT(n) AS activityCount,
+                   COUNT(n) * 2 AS estimatedMinutes
+            FROM NoteEntity n
+            WHERE n.deleted = false
+              AND n.studentId = :studentId
+            GROUP BY FUNCTION('DATE', n.createdAt)
+            """)
+    List<Object[]> summarizeDailyLearningByStudent(@Param("studentId") UUID studentId);
 }

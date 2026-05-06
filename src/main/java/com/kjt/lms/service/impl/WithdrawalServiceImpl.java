@@ -182,7 +182,11 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
     @Transactional(readOnly = true)
     public Page<WithdrawalRequestResponseDto> getPendingWithdrawals(Pageable pageable) {
         securityUtils.isAdmin();
-        return withdrawalRepository.findByStatusAndDeletedFalse(WithdrawalStatusEnum.PENDING, pageable)
+        return withdrawalRepository.findByTypeAndStatusAndDeletedFalse(
+                        WithdrawalTypeEnum.EARNINGS,
+                        WithdrawalStatusEnum.PENDING,
+                        pageable
+                )
                 .map(withdrawalMapper::toResponse);
     }
 
@@ -247,6 +251,9 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
         }
 
         if (entity.getStatus() != WithdrawalStatusEnum.PENDING) {
+            throw new BusinessException(messageProvider.getMessage("exception.withdrawal.invalidStatus"));
+        }
+        if (entity.getType() != WithdrawalTypeEnum.EARNINGS) {
             throw new BusinessException(messageProvider.getMessage("exception.withdrawal.invalidStatus"));
         }
 

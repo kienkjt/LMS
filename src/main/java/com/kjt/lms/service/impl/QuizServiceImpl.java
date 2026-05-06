@@ -64,12 +64,17 @@ public class QuizServiceImpl extends BaseService implements QuizService {
     public QuizResponseDto createQuiz(UUID courseId, CreateQuizRequestDto request) {
         CourseEntity course = findActiveCourseById(courseId);
         validateCourseOwnership(course);
+        if (request.getChapterId() == null && request.getLessonId() == null) {
+            throw new BusinessException("Vui long chon chapter hoac bai hoc cho quiz");
+        }
         validateChapterBelongsToCourse(request.getChapterId(), courseId);
-        validateLessonBelongsToCourse(request.getLessonId(), courseId);
+        LessonEntity lesson = validateLessonBelongsToCourse(request.getLessonId(), courseId);
+        UUID normalizedChapterId = resolveChapterId(request.getChapterId(), lesson);
+        validateLessonChapterConsistency(lesson, normalizedChapterId);
 
         QuizEntity quiz = QuizEntity.builder()
                 .courseId(courseId)
-                .chapterId(request.getChapterId())
+                .chapterId(normalizedChapterId)
                 .lessonId(request.getLessonId())
                 .title(request.getTitle())
                 .description(request.getDescription())
@@ -277,14 +282,31 @@ public class QuizServiceImpl extends BaseService implements QuizService {
                 .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.quiz.question.notFound")));
     }
 
-    private void validateLessonBelongsToCourse(UUID lessonId, UUID courseId) {
+    private LessonEntity validateLessonBelongsToCourse(UUID lessonId, UUID courseId) {
         if (lessonId == null) {
-            return;
+            return null;
         }
         LessonEntity lesson = lessonRepository.findByIdAndDeletedFalse(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.lesson.notFound")));
         if (!courseId.equals(lesson.getCourseId())) {
             throw new BusinessException(messageProvider.getMessage("exception.lesson.notBelongToCourse"));
+        }
+        return lesson;
+    }
+
+    private UUID resolveChapterId(UUID chapterId, LessonEntity lesson) {
+        if (chapterId != null) {
+            return chapterId;
+        }
+        return lesson != null ? lesson.getChapterId() : null;
+    }
+
+    private void validateLessonChapterConsistency(LessonEntity lesson, UUID chapterId) {
+        if (lesson == null || chapterId == null) {
+            return;
+        }
+        if (!chapterId.equals(lesson.getChapterId())) {
+            throw new BusinessException("Bai hoc khong thuoc chapter da chon");
         }
     }
 

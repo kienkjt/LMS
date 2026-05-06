@@ -7,6 +7,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface LessonProgressRepository extends JpaRepository<LessonProgressEntity, UUID> {
@@ -16,5 +18,19 @@ public interface LessonProgressRepository extends JpaRepository<LessonProgressEn
     List<LessonProgressEntity> findByStudentIdAndCourseIdAndDeletedFalse(UUID studentId, UUID courseId);
 
     long countByStudentIdAndCourseIdAndCompletedTrueAndDeletedFalse(UUID studentId, UUID courseId);
+
+    @Query("""
+            SELECT FUNCTION('DATE', lp.completedAt) AS learningDate,
+                   COUNT(lp) AS activityCount,
+                   COALESCE(SUM(COALESCE(l.duration, 0)), 0) AS estimatedMinutes
+            FROM LessonProgressEntity lp
+            JOIN LessonEntity l ON l.id = lp.lessonId
+            WHERE lp.deleted = false
+              AND lp.studentId = :studentId
+              AND lp.completed = true
+              AND lp.completedAt IS NOT NULL
+            GROUP BY FUNCTION('DATE', lp.completedAt)
+            """)
+    List<Object[]> summarizeDailyLearningByStudent(@Param("studentId") UUID studentId);
 }
 

@@ -23,6 +23,12 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
 
     Page<WithdrawalRequestEntity> findByStatusAndDeletedFalse(WithdrawalStatusEnum status, Pageable pageable);
 
+    Page<WithdrawalRequestEntity> findByTypeAndStatusAndDeletedFalse(
+            WithdrawalTypeEnum type,
+            WithdrawalStatusEnum status,
+            Pageable pageable
+    );
+
     Optional<WithdrawalRequestEntity> findByIdAndDeletedFalse(UUID id);
 
     Page<WithdrawalRequestEntity> findByDeletedFalse(Pageable pageable);

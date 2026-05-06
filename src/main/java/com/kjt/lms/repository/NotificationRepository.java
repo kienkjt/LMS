@@ -32,4 +32,12 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
               AND n.deleted = false
             """)
     int markAllAsRead(@Param("userId") UUID userId, @Param("readAt") LocalDateTime readAt);
+
+    boolean existsByUserIdAndTypeAndReferenceTypeAndCreatedAtBetween(
+            UUID userId,
+            com.kjt.lms.common.constants.NotificationTypeEnum type,
+            String referenceType,
+            LocalDateTime start,
+            LocalDateTime end
+    );
 }
