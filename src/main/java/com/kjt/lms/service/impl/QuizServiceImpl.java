@@ -6,6 +6,7 @@ import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
 import com.kjt.lms.model.entity.CourseEntity;
+import com.kjt.lms.model.entity.ChapterEntity;
 import com.kjt.lms.model.entity.LessonEntity;
 import com.kjt.lms.model.entity.QuestionEntity;
 import com.kjt.lms.model.entity.QuizAnswerEntity;
@@ -21,6 +22,7 @@ import com.kjt.lms.model.response.quiz.QuizAnswerResultResponseDto;
 import com.kjt.lms.model.response.quiz.QuizAttemptResponseDto;
 import com.kjt.lms.model.response.quiz.QuizResponseDto;
 import com.kjt.lms.repository.EnrollmentRepository;
+import com.kjt.lms.repository.ChapterRepository;
 import com.kjt.lms.repository.LessonRepository;
 import com.kjt.lms.repository.QuestionRepository;
 import com.kjt.lms.repository.QuizAnswerRepository;
@@ -52,6 +54,7 @@ public class QuizServiceImpl extends BaseService implements QuizService {
     private final QuestionRepository questionRepository;
     private final QuizAttemptRepository quizAttemptRepository;
     private final QuizAnswerRepository quizAnswerRepository;
+    private final ChapterRepository chapterRepository;
     private final LessonRepository lessonRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final MessageProvider messageProvider;
@@ -61,10 +64,12 @@ public class QuizServiceImpl extends BaseService implements QuizService {
     public QuizResponseDto createQuiz(UUID courseId, CreateQuizRequestDto request) {
         CourseEntity course = findActiveCourseById(courseId);
         validateCourseOwnership(course);
+        validateChapterBelongsToCourse(request.getChapterId(), courseId);
         validateLessonBelongsToCourse(request.getLessonId(), courseId);
 
         QuizEntity quiz = QuizEntity.builder()
                 .courseId(courseId)
+                .chapterId(request.getChapterId())
                 .lessonId(request.getLessonId())
                 .title(request.getTitle())
                 .description(request.getDescription())
@@ -283,6 +288,17 @@ public class QuizServiceImpl extends BaseService implements QuizService {
         }
     }
 
+    private void validateChapterBelongsToCourse(UUID chapterId, UUID courseId) {
+        if (chapterId == null) {
+            return;
+        }
+        ChapterEntity chapter = chapterRepository.findByIdAndDeletedFalse(chapterId)
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.chapter.notFound")));
+        if (!courseId.equals(chapter.getCourseId())) {
+            throw new BusinessException(messageProvider.getMessage("exception.chapter.notBelongToCourse"));
+        }
+    }
+
     private void attachQuizToLesson(UUID lessonId, UUID quizId) {
         if (lessonId == null) {
             return;
@@ -349,6 +365,7 @@ public class QuizServiceImpl extends BaseService implements QuizService {
         return QuizResponseDto.builder()
                 .id(quiz.getId())
                 .courseId(quiz.getCourseId())
+                .chapterId(quiz.getChapterId())
                 .lessonId(quiz.getLessonId())
                 .title(quiz.getTitle())
                 .description(quiz.getDescription())

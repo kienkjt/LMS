@@ -7,9 +7,11 @@ import com.kjt.lms.model.request.quiz.CreateQuizRequestDto;
 import com.kjt.lms.model.request.quiz.SubmitQuizRequestDto;
 import com.kjt.lms.model.request.quiz.UpdateQuestionRequestDto;
 import com.kjt.lms.model.request.quiz.UpdateQuizRequestDto;
+import com.kjt.lms.model.response.chapter.ChapterResponseDto;
 import com.kjt.lms.model.response.quiz.QuestionResponseDto;
 import com.kjt.lms.model.response.quiz.QuizAttemptResponseDto;
 import com.kjt.lms.model.response.quiz.QuizResponseDto;
+import com.kjt.lms.service.ChapterService;
 import com.kjt.lms.service.QuizService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -38,7 +40,15 @@ import java.util.UUID;
 public class QuizController {
 
     private final QuizService quizService;
+    private final ChapterService chapterService;
     private final MessageProvider messageProvider;
+
+    @GetMapping("/courses/{courseId}/quiz-selection")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Get course chapters and lessons for quiz creation", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<List<ChapterResponseDto>>> getChaptersForQuizSelection(@PathVariable UUID courseId) {
+        return ResponseEntity.ok(APIResponse.success(chapterService.getChaptersByCourse(courseId), null));
+    }
 
     @PostMapping("/courses/{courseId}/quizzes")
     @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")

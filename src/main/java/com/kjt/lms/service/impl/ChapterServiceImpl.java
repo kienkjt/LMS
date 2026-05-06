@@ -14,9 +14,13 @@ import com.kjt.lms.model.request.chapter.CreateChapterRequestDto;
 import com.kjt.lms.model.request.chapter.UpdateChapterRequestDto;
 import com.kjt.lms.model.response.chapter.ChapterResponseDto;
 import com.kjt.lms.model.response.lesson.LessonResponseDto;
+import com.kjt.lms.model.response.quiz.QuestionResponseDto;
+import com.kjt.lms.model.response.quiz.QuizResponseDto;
 import com.kjt.lms.repository.ChapterRepository;
 import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonRepository;
+import com.kjt.lms.repository.QuestionRepository;
+import com.kjt.lms.repository.QuizRepository;
 import com.kjt.lms.service.ChapterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +41,8 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
 
     private final ChapterRepository chapterRepository;
     private final LessonRepository lessonRepository;
+    private final QuizRepository quizRepository;
+    private final QuestionRepository questionRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final ChapterMapper chapterMapper;
     private final LessonMapper lessonMapper;
@@ -57,6 +63,7 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
 
         ChapterResponseDto response = chapterMapper.toDto(savedChapter);
         response.setLessons(Collections.emptyList());
+        response.setQuizzes(Collections.emptyList());
         return response;
     }
 
@@ -69,6 +76,7 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
 
         ChapterResponseDto response = chapterMapper.toDto(chapter);
         response.setLessons(getLessonDtos(course, chapterId));
+        response.setQuizzes(getQuizDtos(chapterId));
         return response;
     }
 
@@ -91,10 +99,18 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
                         }, Collectors.toList())
                 ));
 
+        // Group quizzes by chapter
+        Map<UUID, List<QuizResponseDto>> quizzesByChapter = chapters.stream()
+                .collect(Collectors.toMap(
+                        ChapterEntity::getId,
+                        chapter -> getQuizDtos(chapter.getId())
+                ));
+
         return chapters.stream()
                 .map(chapter -> {
                     ChapterResponseDto response = chapterMapper.toDto(chapter);
                     response.setLessons(lessonsByChapter.getOrDefault(chapter.getId(), Collections.emptyList()));
+                    response.setQuizzes(quizzesByChapter.getOrDefault(chapter.getId(), Collections.emptyList()));
                     return response;
                 })
                 .toList();
@@ -120,6 +136,7 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
 
         ChapterResponseDto response = chapterMapper.toDto(updatedChapter);
         response.setLessons(getLessonDtos(course, chapterId));
+        response.setQuizzes(getQuizDtos(chapterId));
         return response;
     }
 
@@ -214,5 +231,43 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
         if (!courseId.equals(chapter.getCourseId())) {
             throw new BusinessException(messageProvider.getMessage("exception.chapter.notBelongToCourse"));
         }
+    }
+
+    private List<QuizResponseDto> getQuizDtos(UUID chapterId) {
+        return quizRepository.findByChapterIdAndDeletedFalseOrderByCreatedAtAsc(chapterId)
+                .stream()
+                .map(this::toQuizResponse)
+                .toList();
+    }
+
+    private QuizResponseDto toQuizResponse(com.kjt.lms.model.entity.QuizEntity quiz) {
+        List<QuestionResponseDto> questions = questionRepository
+                .findByQuizIdAndDeletedFalseOrderByCreatedAtAsc(quiz.getId())
+                .stream()
+                .map(question -> QuestionResponseDto.builder()
+                        .id(question.getId())
+                        .quizId(question.getQuizId())
+                        .questionText(question.getQuestionText())
+                        .type(question.getType())
+                        .options(question.getOptions())
+                        .points(question.getPoints())
+                        .build())
+                .toList();
+
+        return QuizResponseDto.builder()
+                .id(quiz.getId())
+                .courseId(quiz.getCourseId())
+                .chapterId(quiz.getChapterId())
+                .lessonId(quiz.getLessonId())
+                .title(quiz.getTitle())
+                .description(quiz.getDescription())
+                .timeLimitMinutes(quiz.getTimeLimitMinutes())
+                .passScore(quiz.getPassScore())
+                .maxAttempts(quiz.getMaxAttempts())
+                .shuffleQuestions(quiz.getShuffleQuestions())
+                .totalQuestions((long) questions.size())
+                .createdAt(quiz.getCreatedAt())
+                .questions(questions)
+                .build();
     }
 }

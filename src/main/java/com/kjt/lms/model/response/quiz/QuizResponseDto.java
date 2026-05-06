@@ -16,6 +16,7 @@ public class QuizResponseDto {
 
     private UUID id;
     private UUID courseId;
+    private UUID chapterId;
     private UUID lessonId;
     private String title;
     private String description;

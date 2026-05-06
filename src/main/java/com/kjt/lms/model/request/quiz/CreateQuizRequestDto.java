@@ -14,6 +14,8 @@ import java.util.UUID;
 @Setter
 public class CreateQuizRequestDto {
 
+    private UUID chapterId;
+
     private UUID lessonId;
 
     @NotBlank

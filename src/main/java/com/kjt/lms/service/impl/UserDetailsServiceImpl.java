@@ -28,10 +28,24 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng: " + email));
 
         RoleEntity role = roleRepository.findById(user.getRoleId())
-                .orElseThrow(() -> new RuntimeException("Role not found"));
+                .orElseThrow(() -> new RuntimeException("Role not found for user: " + email));
 
-        String roleCode = role.getCode().toUpperCase();
-        String authority = roleCode.startsWith("ROLE_") ? roleCode : "ROLE_" + roleCode;
+        // Validate and normalize role code
+        String roleCode = role.getCode();
+        if (roleCode == null || roleCode.trim().isEmpty()) {
+            throw new RuntimeException("Role code is null or empty for user: " + email);
+        }
+
+        // Trim and convert to uppercase
+        roleCode = roleCode.trim().toUpperCase();
+
+        // Ensure ROLE_ prefix is present exactly once
+        String authority;
+        if (roleCode.startsWith("ROLE_")) {
+            authority = roleCode;
+        } else {
+            authority = "ROLE_" + roleCode;
+        }
 
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())

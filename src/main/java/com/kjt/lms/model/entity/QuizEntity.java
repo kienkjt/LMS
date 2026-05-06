@@ -26,6 +26,10 @@ public class QuizEntity extends BaseEntity {
     @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID lessonId;
 
+    @Column(name = "chapter_id", length = 36)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    private UUID chapterId;
+
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 

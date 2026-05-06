@@ -28,23 +28,28 @@ import java.util.Map;
 public class LearningAssistantServiceImpl implements LearningAssistantService {
 
     private static final String PROMPT_TEMPLATE = """
-            Ban la tro ly hoc tap AI cua he thong LMS ban khoa hoc online.
+            Ban la tro ly hoc tap AI cua he thong LMS.
 
-            Nhiem vu cua ban:
-            - Ho tro hoc vien tra loi cac cau hoi lien quan den khoa hoc
-            - Giai thich bai hoc dua tren noi dung duoc cung cap
-            - Huong dan lo trinh hoc phu hop
-            - Ho tro theo doi tien do hoc tap
-            - Goi y bai hoc tiep theo dua tren tien do hien tai
+            Muc tieu:
+            - Tra loi cau hoi hoc tap dua tren Context.
+            - Voi cau hoi don gian: tra loi ngan gon, trong tam.
+            - Voi cau hoi phuc tap: giai thich theo tung buoc, co cau truc ro rang.
 
-            Quy tac bat buoc:
-            1. Chi tra loi dua tren du lieu duoc cung cap trong phan Context
-            2. Khong tu bia thong tin ngoai Context
-            3. Neu Context khong du thong tin, phai tra loi ro:
+            QUY TAC BAT BUOC:
+            1) CHI su dung thong tin nam trong Context.
+            2) Khong suy dien vuot qua Context.
+            3) Neu Context thieu du lieu de ket luan, bat buoc tra loi:
                "Toi chua tim thay thong tin phu hop trong he thong khoa hoc."
-            4. Tra loi ngan gon, de hieu, dung trong tam
-            5. Uu tien tra loi bang tieng Viet
-            6. Neu nguoi dung hoi ngoai pham vi hoc tap (chinh tri, y te, tai chinh, noi dung khong lien quan LMS), hay lich su tu choi
+               Sau do de xuat nguoi hoc can cung cap them thong tin nao.
+            4) Uu tien tieng Viet, de hieu, chinh xac.
+            5) Neu cau hoi ngoai pham vi hoc tap LMS (chinh tri, y te, tai chinh, noi dung khong lien quan), lich su tu choi.
+
+            CHE DO TRA LOI: %s
+            - SIMPLE: 1 doan ngan + vi du ngan (neu can)
+            - COMPLEX: tra loi theo cac muc:
+              (a) Ket luan chinh
+              (b) Phan tich theo tung buoc
+              (c) Goi y hanh dong tiep theo cho hoc vien
 
             Thong tin hoc vien:
             - Ten: %s
@@ -57,9 +62,14 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
 
             Cau hoi cua hoc vien:
             %s
-
-            Hay tra loi chinh xac va huu ich nhat.
             """;
+
+    private static final int MIN_COMPLEX_QUESTION_LENGTH = 120;
+    private static final List<String> COMPLEX_KEYWORDS = List.of(
+            "tai sao", "vi sao", "so sanh", "phan tich", "chung minh",
+            "thuat toan", "toi uu", "trade-off", "kien truc", "he thong",
+            "multi", "nhieu buoc", "step by step", "chi tiet"
+    );
 
     private final ObjectMapper objectMapper;
     private final MessageProvider messageProvider;
@@ -76,18 +86,38 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
     @Value("${gemini.timeout-seconds:60}")
     private int timeoutSeconds;
 
+    @Value("${gemini.advanced-model:gemini-1.5-pro}")
+    private String geminiAdvancedModel;
+
+    @Value("${gemini.temperature.simple:0.3}")
+    private double simpleTemperature;
+
+    @Value("${gemini.temperature.complex:0.2}")
+    private double complexTemperature;
+
+    @Value("${gemini.max-output-tokens:1024}")
+    private int maxOutputTokens;
+
+    @Value("${gemini.max-context-chars:12000}")
+    private int maxContextChars;
+
     @Override
     public LearningAssistantPromptResponseDto askAssistant(LearningAssistantPromptRequestDto request) {
+        String question = normalize(request.getUserQuestion());
+        String context = limitText(normalize(request.getRetrievedChunks()), Math.max(maxContextChars, 2000));
+        boolean complex = isComplexQuestion(question);
+        String answerMode = complex ? "COMPLEX" : "SIMPLE";
         String prompt = PROMPT_TEMPLATE.formatted(
+                answerMode,
                 normalize(request.getStudentName()),
                 normalize(request.getCourseName()),
                 request.getProgressPercent() == null ? 0 : request.getProgressPercent(),
                 normalize(request.getCurrentLesson()),
-                normalize(request.getRetrievedChunks()),
-                normalize(request.getUserQuestion())
+                context,
+                question
         );
 
-        String answer = callGemini(prompt);
+        String answer = callGemini(prompt, complex);
 
         return LearningAssistantPromptResponseDto.builder()
                 .prompt(prompt)
@@ -95,7 +125,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
                 .build();
     }
 
-    private String callGemini(String prompt) {
+    private String callGemini(String prompt, boolean complexMode) {
         String apiKey = normalize(geminiApiKey);
         if (apiKey.isEmpty()) {
             throw new BusinessException(messageProvider.getMessage("exception.ai.missingApiKey"));
@@ -106,9 +136,14 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             payload.put("contents", List.of(
                     Map.of("parts", List.of(Map.of("text", prompt)))
             ));
+            payload.put("generationConfig", Map.of(
+                    "temperature", complexMode ? complexTemperature : simpleTemperature,
+                    "topP", 0.9,
+                    "maxOutputTokens", Math.max(256, maxOutputTokens)
+            ));
 
             String body = objectMapper.writeValueAsString(payload);
-            String model = normalize(geminiModel).isEmpty() ? "gemini-1.5-flash" : normalize(geminiModel);
+            String model = resolveModel(complexMode);
             String url = normalize(geminiBaseUrl) + "/models/" + model + ":generateContent?key=" + apiKey;
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -174,5 +209,32 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String resolveModel(boolean complexMode) {
+        String defaultModel = normalize(geminiModel).isEmpty() ? "gemini-2.5-flash" : normalize(geminiModel);
+        if (!complexMode) {
+            return defaultModel;
+        }
+        String advancedModel = normalize(geminiAdvancedModel);
+        return advancedModel.isEmpty() ? defaultModel : advancedModel;
+    }
+
+    private boolean isComplexQuestion(String question) {
+        String normalizedQuestion = normalize(question).toLowerCase();
+        if (normalizedQuestion.length() >= MIN_COMPLEX_QUESTION_LENGTH) {
+            return true;
+        }
+        return COMPLEX_KEYWORDS.stream().anyMatch(normalizedQuestion::contains);
+    }
+
+    private String limitText(String text, int maxChars) {
+        if (text == null) {
+            return "";
+        }
+        if (text.length() <= maxChars) {
+            return text;
+        }
+        return text.substring(0, maxChars) + "\n[Context da duoc cat gon do qua dai]";
     }
 }

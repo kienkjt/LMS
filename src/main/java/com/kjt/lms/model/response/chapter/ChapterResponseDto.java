@@ -1,6 +1,7 @@
 package com.kjt.lms.model.response.chapter;
 
 import com.kjt.lms.model.response.lesson.LessonResponseDto;
+import com.kjt.lms.model.response.quiz.QuizResponseDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,5 +23,6 @@ public class ChapterResponseDto {
     private Integer totalLessons;
     private Integer totalDuration;
     private List<LessonResponseDto> lessons;
+    private List<QuizResponseDto> quizzes;
 }
 
