@@ -8,27 +8,30 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class LearningAssistantPromptRequestDto {
 
-    @NotBlank
     private String studentName;
 
-    @NotBlank
     private String courseName;
 
     @Min(0)
     @Max(100)
     private Integer progressPercent;
 
-    @NotBlank
     private String currentLesson;
 
-    @NotBlank
     private String retrievedChunks;
+
+    private UUID courseId;
+
+    @Builder.Default
+    private Boolean includeSystemContext = Boolean.TRUE;
 
     @NotBlank
     private String userQuestion;

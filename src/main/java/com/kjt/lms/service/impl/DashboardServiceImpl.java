@@ -78,11 +78,14 @@ public class DashboardServiceImpl extends BaseService implements DashboardServic
                 .totalRevenue(totalRevenue)
                 .averageRevenuePerSale(average(totalRevenue, soldItems))
                 .dailyRevenue(toTimeSeries(orderItemRepository.findDailyInstructorRevenueTrend(
-                        instructorId,
+                        instructorId.toString(),
                         OrderStatusEnum.COMPLETED.getValue(),
                         last30Days
                 )))
-                .dailyEnrollments(toTimeSeries(enrollmentRepository.findDailyEnrollmentTrendByInstructor(instructorId, last30Days)))
+                .dailyEnrollments(toTimeSeries(enrollmentRepository.findDailyEnrollmentTrendByInstructor(
+                        instructorId.toString(),
+                        last30Days
+                )))
                 .courseStatusDistribution(instructorCourseStatusDistribution(instructorId))
                 .topSellingCourses(orderItemRepository.findTopSellingCoursesByInstructor(
                         instructorId,

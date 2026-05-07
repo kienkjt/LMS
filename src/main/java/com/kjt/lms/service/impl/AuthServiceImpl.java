@@ -26,6 +26,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -100,6 +102,10 @@ public class AuthServiceImpl implements AuthService {
                 throw new BusinessException(messageProvider.getMessage("auth.login.notVerified"));
             }
 
+            if (Boolean.TRUE.equals(user.getIsLocked())) {
+                throw new BusinessException(messageProvider.getMessage("auth.login.locked"));
+            }
+
             if (user.getActive() != CommonStatusEnum.ACTIVE) {
                 throw new BusinessException(messageProvider.getMessage("auth.login.inactive"));
             }
@@ -119,6 +125,10 @@ public class AuthServiceImpl implements AuthService {
 
         } catch (BadCredentialsException e) {
             throw new BusinessException(messageProvider.getMessage("auth.login.invalidCredentials"));
+        } catch (LockedException e) {
+            throw new BusinessException(messageProvider.getMessage("auth.login.locked"));
+        } catch (DisabledException e) {
+            throw new BusinessException(messageProvider.getMessage("auth.login.notVerified"));
         }
     }
 
@@ -140,6 +150,9 @@ public class AuthServiceImpl implements AuthService {
 
         if (!user.getIsVerified() || user.getActive() != CommonStatusEnum.ACTIVE) {
             throw new BusinessException(messageProvider.getMessage("auth.refresh.accountInactive"));
+        }
+        if (Boolean.TRUE.equals(user.getIsLocked())) {
+            throw new BusinessException(messageProvider.getMessage("auth.refresh.accountLocked"));
         }
 
         String role = roleRepository.findById(user.getRoleId())

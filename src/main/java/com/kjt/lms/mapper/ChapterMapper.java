@@ -26,6 +26,7 @@ public interface ChapterMapper {
     ChapterEntity toCreateEntity(CreateChapterRequestDto request, UUID courseId);
 
     @Mapping(target = "lessons", ignore = true)
+    @Mapping(target = "quizzes", ignore = true)
     ChapterResponseDto toDto(ChapterEntity entity);
 
     @Mapping(target = "id", ignore = true)

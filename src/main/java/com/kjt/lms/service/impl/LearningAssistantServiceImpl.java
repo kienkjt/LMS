@@ -3,9 +3,20 @@ package com.kjt.lms.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kjt.lms.common.i18n.MessageProvider;
+import com.kjt.lms.common.security.SecurityUtils;
 import com.kjt.lms.exception.BusinessException;
+import com.kjt.lms.model.entity.CourseEntity;
+import com.kjt.lms.model.entity.EnrollmentEntity;
+import com.kjt.lms.model.entity.LessonEntity;
+import com.kjt.lms.model.entity.LessonProgressEntity;
+import com.kjt.lms.model.entity.UserEntity;
 import com.kjt.lms.model.request.ai.LearningAssistantPromptRequestDto;
 import com.kjt.lms.model.response.ai.LearningAssistantPromptResponseDto;
+import com.kjt.lms.repository.CourseRepository;
+import com.kjt.lms.repository.EnrollmentRepository;
+import com.kjt.lms.repository.LessonProgressRepository;
+import com.kjt.lms.repository.LessonRepository;
+import com.kjt.lms.repository.UserRepository;
 import com.kjt.lms.service.LearningAssistantService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,9 +29,15 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,11 +49,12 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
 
             Muc tieu:
             - Tra loi cau hoi hoc tap dua tren Context.
+            - Duoc phep su dung context he thong LMS (ho so hoc vien, khoa hoc, tien do) de tra loi sat thuc te.
             - Voi cau hoi don gian: tra loi ngan gon, trong tam.
             - Voi cau hoi phuc tap: giai thich theo tung buoc, co cau truc ro rang.
 
             QUY TAC BAT BUOC:
-            1) CHI su dung thong tin nam trong Context.
+            1) CHI su dung thong tin nam trong Context (bao gom context nguoi dung gui len va context he thong LMS).
             2) Khong suy dien vuot qua Context.
             3) Neu Context thieu du lieu de ket luan, bat buoc tra loi:
                "Toi chua tim thay thong tin phu hop trong he thong khoa hoc."
@@ -73,6 +91,12 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
 
     private final ObjectMapper objectMapper;
     private final MessageProvider messageProvider;
+    private final SecurityUtils securityUtils;
+    private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final CourseRepository courseRepository;
+    private final LessonRepository lessonRepository;
+    private final LessonProgressRepository lessonProgressRepository;
 
     @Value("${gemini.api-key:}")
     private String geminiApiKey;
@@ -103,16 +127,18 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
 
     @Override
     public LearningAssistantPromptResponseDto askAssistant(LearningAssistantPromptRequestDto request) {
+        UUID currentUserId = securityUtils.getCurrentUserId();
         String question = normalize(request.getUserQuestion());
-        String context = limitText(normalize(request.getRetrievedChunks()), Math.max(maxContextChars, 2000));
+        AssistantContextData assistantContextData = buildAssistantContext(currentUserId, request);
+        String context = limitText(assistantContextData.context(), Math.max(maxContextChars, 2000));
         boolean complex = isComplexQuestion(question);
         String answerMode = complex ? "COMPLEX" : "SIMPLE";
         String prompt = PROMPT_TEMPLATE.formatted(
                 answerMode,
-                normalize(request.getStudentName()),
-                normalize(request.getCourseName()),
-                request.getProgressPercent() == null ? 0 : request.getProgressPercent(),
-                normalize(request.getCurrentLesson()),
+                assistantContextData.studentName(),
+                assistantContextData.courseName(),
+                assistantContextData.progressPercent(),
+                assistantContextData.currentLesson(),
                 context,
                 question
         );
@@ -211,6 +237,126 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
         return value == null ? "" : value.trim();
     }
 
+    private AssistantContextData buildAssistantContext(UUID currentUserId, LearningAssistantPromptRequestDto request) {
+        UserEntity user = userRepository.findById(currentUserId).orElse(null);
+        String studentName = normalize(request.getStudentName());
+        if (studentName.isEmpty() && user != null) {
+            studentName = normalize(user.getFullName());
+        }
+
+        Optional<EnrollmentEntity> selectedEnrollment = resolveSelectedEnrollment(currentUserId, request.getCourseId());
+        CourseEntity selectedCourse = selectedEnrollment
+                .flatMap(enrollment -> courseRepository.findByIdAndDeletedFalse(enrollment.getCourseId()))
+                .orElse(null);
+
+        String courseName = normalize(request.getCourseName());
+        if (courseName.isEmpty() && selectedCourse != null) {
+            courseName = normalize(selectedCourse.getTitle());
+        }
+
+        int progressPercent = request.getProgressPercent() == null ? -1 : request.getProgressPercent();
+        if (progressPercent < 0 && selectedEnrollment.isPresent() && selectedEnrollment.get().getProgressPercent() != null) {
+            progressPercent = selectedEnrollment.get().getProgressPercent().intValue();
+        }
+        if (progressPercent < 0) {
+            progressPercent = 0;
+        }
+
+        String currentLesson = normalize(request.getCurrentLesson());
+        if (currentLesson.isEmpty()) {
+            currentLesson = resolveCurrentLessonName(currentUserId, selectedEnrollment.map(EnrollmentEntity::getCourseId).orElse(null));
+        }
+
+        StringBuilder contextBuilder = new StringBuilder();
+        String retrievedChunks = normalize(request.getRetrievedChunks());
+        if (!retrievedChunks.isEmpty()) {
+            contextBuilder.append("Nguon nguoi dung cung cap:\n").append(retrievedChunks).append("\n\n");
+        }
+
+        if (Boolean.TRUE.equals(request.getIncludeSystemContext())) {
+            contextBuilder.append(buildSystemContext(currentUserId, selectedEnrollment, selectedCourse, progressPercent, currentLesson));
+        }
+
+        return new AssistantContextData(
+                studentName.isEmpty() ? "Hoc vien" : studentName,
+                courseName.isEmpty() ? "Chua xac dinh" : courseName,
+                Math.max(0, Math.min(100, progressPercent)),
+                currentLesson.isEmpty() ? "Chua xac dinh" : currentLesson,
+                contextBuilder.toString().trim()
+        );
+    }
+
+    private Optional<EnrollmentEntity> resolveSelectedEnrollment(UUID currentUserId, UUID courseId) {
+        if (courseId != null) {
+            return enrollmentRepository.findByStudentIdAndCourseIdAndDeletedFalse(currentUserId, courseId);
+        }
+
+        return enrollmentRepository.findByStudentIdAndDeletedFalse(currentUserId).stream()
+                .max(Comparator.comparing(EnrollmentEntity::getCreatedAt));
+    }
+
+    private String resolveCurrentLessonName(UUID studentId, UUID courseId) {
+        if (courseId == null) {
+            return "";
+        }
+        List<LessonEntity> lessons = lessonRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(courseId);
+        if (lessons.isEmpty()) {
+            return "";
+        }
+
+        Set<UUID> completedLessonIds = lessonProgressRepository.findByStudentIdAndCourseIdAndDeletedFalse(studentId, courseId).stream()
+                .filter(progress -> Boolean.TRUE.equals(progress.getCompleted()))
+                .map(LessonProgressEntity::getLessonId)
+                .collect(Collectors.toSet());
+
+        return lessons.stream()
+                .filter(lesson -> !completedLessonIds.contains(lesson.getId()))
+                .findFirst()
+                .map(LessonEntity::getTitle)
+                .orElse(lessons.get(lessons.size() - 1).getTitle());
+    }
+
+    private String buildSystemContext(
+            UUID currentUserId,
+            Optional<EnrollmentEntity> selectedEnrollment,
+            CourseEntity selectedCourse,
+            int progressPercent,
+            String currentLesson
+    ) {
+        StringBuilder systemContext = new StringBuilder();
+        systemContext.append("Nguon he thong LMS:\n");
+
+        List<EnrollmentEntity> enrollments = enrollmentRepository.findByStudentIdAndDeletedFalse(currentUserId);
+        systemContext.append("- Tong so khoa hoc da ghi danh: ").append(enrollments.size()).append("\n");
+
+        Set<String> enrolledCourseTitles = new LinkedHashSet<>();
+        for (EnrollmentEntity enrollment : enrollments.stream().limit(5).toList()) {
+            courseRepository.findByIdAndDeletedFalse(enrollment.getCourseId())
+                    .map(CourseEntity::getTitle)
+                    .ifPresent(enrolledCourseTitles::add);
+        }
+        if (!enrolledCourseTitles.isEmpty()) {
+            systemContext.append("- Cac khoa hoc gan day: ")
+                    .append(String.join(", ", enrolledCourseTitles))
+                    .append("\n");
+        }
+
+        if (selectedEnrollment.isPresent() && selectedCourse != null) {
+            UUID courseId = selectedEnrollment.get().getCourseId();
+            long completedLessons = lessonProgressRepository
+                    .countByStudentIdAndCourseIdAndCompletedTrueAndDeletedFalse(currentUserId, courseId);
+            long totalLessons = lessonRepository.countByCourseIdAndDeletedFalse(courseId);
+            systemContext.append("- Khoa hoc dang xet: ").append(normalize(selectedCourse.getTitle())).append("\n");
+            systemContext.append("- Tien do khoa hoc: ").append(progressPercent).append("%")
+                    .append(" (").append(completedLessons).append("/").append(totalLessons).append(" bai da hoan thanh)\n");
+            if (!normalize(currentLesson).isEmpty()) {
+                systemContext.append("- Bai hoc hien tai/goi y tiep theo: ").append(currentLesson).append("\n");
+            }
+        }
+
+        return systemContext.toString();
+    }
+
     private String resolveModel(boolean complexMode) {
         String defaultModel = normalize(geminiModel).isEmpty() ? "gemini-2.5-flash" : normalize(geminiModel);
         if (!complexMode) {
@@ -236,5 +382,14 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             return text;
         }
         return text.substring(0, maxChars) + "\n[Context da duoc cat gon do qua dai]";
+    }
+
+    private record AssistantContextData(
+            String studentName,
+            String courseName,
+            int progressPercent,
+            String currentLesson,
+            String context
+    ) {
     }
 }

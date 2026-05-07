@@ -80,6 +80,7 @@ public interface CourseMapper {
     CourseDetailResponseDto toDetailDto(CourseEntity entity);
 
     @Mapping(target = "lessons", ignore = true)
+    @Mapping(target = "quizzes", ignore = true)
     ChapterResponseDto toChapterDto(ChapterEntity entity);
 
     @Mapping(target = "freePreview", expression = "java(entity.getFreePreview() == com.kjt.lms.common.constants.YesNoEnum.ACTIVE)")

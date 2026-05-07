@@ -68,8 +68,8 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID
             SELECT new com.kjt.lms.model.response.dashboard.TopCourseDashboardDto(
                 c.id,
                 c.title,
-                COUNT(oi),
-                COALESCE(SUM(oi.paidPrice), 0),
+                CAST(COUNT(oi) AS long),
+                CAST(COALESCE(SUM(oi.paidPrice), 0) AS java.math.BigDecimal),
                 COALESCE(c.avgRating, 0.0),
                 c.totalStudents
             )
@@ -89,8 +89,8 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID
             SELECT new com.kjt.lms.model.response.dashboard.TopCourseDashboardDto(
                 c.id,
                 c.title,
-                COUNT(oi),
-                COALESCE(SUM(oi.instructorRevenue), 0),
+                CAST(COUNT(oi) AS long),
+                CAST(COALESCE(SUM(oi.instructorRevenue), 0) AS java.math.BigDecimal),
                 COALESCE(c.avgRating, 0.0),
                 c.totalStudents
             )
@@ -111,21 +111,21 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID
             Pageable pageable);
 
     @Query(value = """
-            SELECT DATE_FORMAT(o.paid_at, '%Y-%m-%d') AS label,
-                   COALESCE(SUM(oi.instructor_revenue), 0) AS amount,
-                   COUNT(*) AS count
-            FROM order_items oi
-            JOIN orders o ON o.id = oi.order_id
-            WHERE oi.instructor_id = :instructorId
-              AND o.status = :status
-              AND oi.deleted = false
-              AND o.deleted = false
-              AND o.paid_at >= :fromDate
-            GROUP BY DATE_FORMAT(o.paid_at, '%Y-%m-%d')
-            ORDER BY label
-            """, nativeQuery = true)
+        SELECT DATE_FORMAT(o.paid_at, '%Y-%m-%d') AS label,
+               COALESCE(SUM(oi.instructor_revenue), 0) AS amount,
+               COUNT(*) AS count
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE oi.instructor_id = :instructorId
+          AND o.status = :status
+          AND oi.deleted = false
+          AND o.deleted = false
+          AND o.paid_at >= :fromDate
+        GROUP BY DATE_FORMAT(o.paid_at, '%Y-%m-%d')
+        ORDER BY label
+        """, nativeQuery = true)
     List<TimeSeriesProjection> findDailyInstructorRevenueTrend(
-            @Param("instructorId") UUID instructorId,
+            @Param("instructorId") String instructorId,
             @Param("status") String status,
             @Param("fromDate") LocalDateTime fromDate);
 }

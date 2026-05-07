@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -50,9 +51,16 @@ public class MediaStorageServiceImpl implements MediaStorageService {
     // Cloudinary recommends chunked upload for larger video payloads.
     private static final long LARGE_VIDEO_UPLOAD_THRESHOLD_BYTES = 100L * 1024 * 1024;
     private static final Set<String> ALLOWED_VIDEO_EXTENSIONS = Set.of("mp4", "mpeg", "mpg", "mov", "avi", "flv", "webm", "mkv");
+    private static final Set<String> ALLOWED_DOCUMENT_EXTENSIONS = Set.of("pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt", "md", "zip");
 
     @Value("${app.media.course-video.allowed-content-types:video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/x-flv,video/webm}")
     private String allowedCourseVideoContentTypes;
+
+    @Value("${app.media.course-document.max-size-bytes:104857600}")
+    private long maxCourseDocumentSizeBytes;
+
+    @Value("${app.media.course-document.allowed-content-types:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/markdown,application/zip,application/x-zip-compressed}")
+    private String allowedCourseDocumentContentTypes;
 
     @Override
     public MediaUploadResponse uploadCourseImage(MultipartFile file) {
@@ -85,19 +93,18 @@ public class MediaStorageServiceImpl implements MediaStorageService {
             tempFile = File.createTempFile("lms-course-video-", ".upload");
             file.transferTo(tempFile);
 
-            Map<String, Object> options = ObjectUtils.asMap(
-                    "folder", "lms/courses/videos",
-                    "resource_type", "video",
-                    "quality", "auto",
-                    "eager", java.util.List.of(
-                            new Transformation()
-                                    .width(1280)
-                                    .height(720)
-                                    .crop("scale")
-                                    .quality("auto")
-                    ),
-                    "eager_async", true
-            );
+            Map<String, Object> options = new HashMap<>();
+            options.put("folder", "lms/courses/videos");
+            options.put("resource_type", "video");
+            options.put("quality", "auto");
+            options.put("eager", java.util.List.of(
+                    new Transformation()
+                            .width(1280)
+                            .height(720)
+                            .crop("scale")
+                            .quality("auto")
+            ));
+            options.put("eager_async", true);
 
             Map<?, ?> uploadResult;
             if (file.getSize() > LARGE_VIDEO_UPLOAD_THRESHOLD_BYTES) {
@@ -115,6 +122,27 @@ public class MediaStorageServiceImpl implements MediaStorageService {
             if (tempFile != null && tempFile.exists() && !tempFile.delete()) {
                 log.warn("Cannot delete temp video file: {}", tempFile.getAbsolutePath());
             }
+        }
+    }
+
+    @Override
+    public MediaUploadResponse uploadCourseDocument(MultipartFile file) {
+        validateCourseDocumentFile(file);
+
+        try {
+            Map<?, ?> uploadResult = courseImageCloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "folder", "lms/courses/documents",
+                            "resource_type", "raw"
+                    )
+            );
+
+            return buildMediaUploadResponse(uploadResult, "raw");
+
+        } catch (IOException ex) {
+            log.error("Course document upload failed", ex);
+            throw new BusinessException(messageProvider.getMessage("media.course.document.upload.failed"));
         }
     }
 
@@ -211,6 +239,48 @@ public class MediaStorageServiceImpl implements MediaStorageService {
 
     private Set<String> getAllowedCourseVideoContentTypes() {
         return Arrays.stream(allowedCourseVideoContentTypes.split(","))
+                .map(value -> value.toLowerCase(Locale.ROOT).trim())
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toSet());
+    }
+
+    private void validateCourseDocumentFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(messageProvider.getMessage("validation.course.document.required"));
+        }
+
+        if (file.getSize() > maxCourseDocumentSizeBytes) {
+            throw new BusinessException(
+                    messageProvider.getMessage("validation.course.document.maxSize", maxCourseDocumentSizeBytes));
+        }
+
+        String contentType = file.getContentType();
+        String normalizedContentType = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT).trim();
+
+        boolean allowedByContentType = !normalizedContentType.isEmpty()
+                && getAllowedCourseDocumentContentTypes().contains(normalizedContentType);
+        boolean allowedByExtension = isAllowedDocumentExtension(file.getOriginalFilename());
+
+        if (!allowedByContentType && !allowedByExtension) {
+            log.warn("Rejected course document upload. contentType={}, filename={}", contentType, file.getOriginalFilename());
+            throw new BusinessException(messageProvider.getMessage("validation.course.document.invalidType"));
+        }
+    }
+
+    private boolean isAllowedDocumentExtension(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return false;
+        }
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == fileName.length() - 1) {
+            return false;
+        }
+        String extension = fileName.substring(dotIndex + 1).toLowerCase(Locale.ROOT).trim();
+        return ALLOWED_DOCUMENT_EXTENSIONS.contains(extension);
+    }
+
+    private Set<String> getAllowedCourseDocumentContentTypes() {
+        return Arrays.stream(allowedCourseDocumentContentTypes.split(","))
                 .map(value -> value.toLowerCase(Locale.ROOT).trim())
                 .filter(value -> !value.isEmpty())
                 .collect(Collectors.toSet());

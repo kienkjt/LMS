@@ -8,12 +8,13 @@ import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.i18n.LocaleChangeInterceptor;
-import org.springframework.web.servlet.i18n.SessionLocaleResolver;
+import org.springframework.web.servlet.i18n.CookieLocaleResolver;
 
 import java.util.Locale;
 
 @Configuration
 public class MessageConfig implements WebMvcConfigurer {
+    private static final Locale DEFAULT_LOCALE = Locale.forLanguageTag("vi");
 
     @Bean
     public MessageSource messageSource() {
@@ -22,15 +23,13 @@ public class MessageConfig implements WebMvcConfigurer {
 
         messageSource.setBasename("classpath:i18n/messages");
         messageSource.setDefaultEncoding("UTF-8");
-        messageSource.setDefaultLocale(new Locale("vi"));
-
         return messageSource;
     }
 
     @Bean
     public LocaleResolver localeResolver() {
-        SessionLocaleResolver localeResolver = new SessionLocaleResolver();
-        localeResolver.setDefaultLocale(new Locale("vi"));
+        CookieLocaleResolver localeResolver = new CookieLocaleResolver();
+        localeResolver.setDefaultLocale(DEFAULT_LOCALE);
 
         return localeResolver;
     }

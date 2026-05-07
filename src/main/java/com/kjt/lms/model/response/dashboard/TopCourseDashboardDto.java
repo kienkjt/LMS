@@ -13,7 +13,6 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 public class TopCourseDashboardDto {
-
     private UUID courseId;
     private String courseTitle;
     private long soldItems;

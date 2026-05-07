@@ -10,6 +10,8 @@ public interface MediaStorageService {
 
     MediaUploadResponse uploadCourseVideo(MultipartFile file);
 
+    MediaUploadResponse uploadCourseDocument(MultipartFile file);
+
     void deleteMedia(String publicId, String resourceType);
 }
 

@@ -50,6 +50,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())
                 .password(user.getPassword())
+                .accountLocked(Boolean.TRUE.equals(user.getIsLocked()))
+                .disabled(!Boolean.TRUE.equals(user.getIsVerified()))
                 .authorities(Collections.singletonList(
                         new SimpleGrantedAuthority(authority)
                 ))

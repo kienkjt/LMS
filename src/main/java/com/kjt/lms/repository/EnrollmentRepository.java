@@ -58,13 +58,13 @@ public interface EnrollmentRepository extends JpaRepository<EnrollmentEntity, UU
             JOIN courses c ON c.id = e.course_id
             WHERE e.deleted = false
               AND c.deleted = false
-              AND c.instructor_id = :instructorId
+              AND c.instructor_id = CAST(:instructorId AS CHAR(36))
               AND e.created_at >= :fromDate
             GROUP BY DATE_FORMAT(e.created_at, '%Y-%m-%d')
             ORDER BY label
             """, nativeQuery = true)
     List<TimeSeriesProjection> findDailyEnrollmentTrendByInstructor(
-            @Param("instructorId") UUID instructorId,
+            @Param("instructorId") String instructorId,
             @Param("fromDate") LocalDateTime fromDate);
 
     @Query("""

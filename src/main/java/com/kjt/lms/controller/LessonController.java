@@ -101,4 +101,16 @@ public class LessonController {
         LessonResponseDto response = lessonService.uploadLessonVideo(courseId, chapterId, lessonId, file);
         return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("lesson.video.upload.success")));
     }
+
+    @PostMapping("/{lessonId}/document")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'ADMIN')")
+    @Operation(summary = "Upload lesson document", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<LessonResponseDto>> uploadLessonDocument(
+            @PathVariable UUID courseId,
+            @PathVariable UUID chapterId,
+            @PathVariable UUID lessonId,
+            @RequestParam("file") MultipartFile file) {
+        LessonResponseDto response = lessonService.uploadLessonDocument(courseId, chapterId, lessonId, file);
+        return ResponseEntity.ok(APIResponse.success(response, messageProvider.getMessage("lesson.document.upload.success")));
+    }
 }

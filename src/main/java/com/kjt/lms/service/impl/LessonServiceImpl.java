@@ -176,6 +176,32 @@ public class LessonServiceImpl extends BaseService implements LessonService {
         }
     }
 
+    @Override
+    @Transactional
+    public LessonResponseDto uploadLessonDocument(UUID courseId, UUID chapterId, UUID lessonId, MultipartFile file) {
+        CourseEntity course = findActiveCourseById(courseId);
+        validateCourseOwnership(course);
+
+        ChapterEntity chapter = findActiveChapterById(chapterId);
+        validateChapterBelongsToCourse(courseId, chapter);
+
+        LessonEntity lesson = findActiveLessonById(lessonId);
+        validateLessonBelongsToChapterAndCourse(courseId, chapterId, lesson);
+
+        try {
+            MediaUploadResponse uploadResponse = mediaStorageService.uploadCourseDocument(file);
+
+            lesson.setContent(uploadResponse.getSecureUrl());
+            LessonEntity updatedLesson = lessonRepository.save(lesson);
+
+            log.info("Lesson document uploaded: {} in chapter: {} of course: {}", lessonId, chapterId, courseId);
+            return lessonMapper.toDto(updatedLesson);
+        } catch (Exception ex) {
+            log.error("Lesson document upload failed: {} - {}", lessonId, ex.getMessage());
+            throw new BusinessException(messageProvider.getMessage("media.lesson.document.upload.failed"));
+        }
+    }
+
 
     private ChapterEntity findActiveChapterById(UUID chapterId) {
         return chapterRepository.findByIdAndDeletedFalse(chapterId)

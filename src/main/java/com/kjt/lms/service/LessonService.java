@@ -21,4 +21,6 @@ public interface LessonService {
     void deleteLesson(UUID courseId, UUID chapterId, UUID lessonId);
 
     LessonResponseDto uploadLessonVideo(UUID courseId, UUID chapterId, UUID lessonId, MultipartFile file);
+
+    LessonResponseDto uploadLessonDocument(UUID courseId, UUID chapterId, UUID lessonId, MultipartFile file);
 }
