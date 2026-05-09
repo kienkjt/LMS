@@ -9,6 +9,10 @@ import com.kjt.lms.mapper.LessonMapper;
 import com.kjt.lms.model.entity.ChapterEntity;
 import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.LessonEntity;
+import com.kjt.lms.model.entity.QuestionEntity;
+import com.kjt.lms.model.entity.QuizAnswerEntity;
+import com.kjt.lms.model.entity.QuizAttemptEntity;
+import com.kjt.lms.model.entity.QuizEntity;
 import com.kjt.lms.model.request.lesson.CreateLessonRequestDto;
 import com.kjt.lms.model.request.lesson.UpdateLessonRequestDto;
 import com.kjt.lms.model.response.lesson.LessonResponseDto;
@@ -16,6 +20,10 @@ import com.kjt.lms.model.response.media.MediaUploadResponse;
 import com.kjt.lms.repository.ChapterRepository;
 import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonRepository;
+import com.kjt.lms.repository.QuestionRepository;
+import com.kjt.lms.repository.QuizAnswerRepository;
+import com.kjt.lms.repository.QuizAttemptRepository;
+import com.kjt.lms.repository.QuizRepository;
 import com.kjt.lms.service.LessonService;
 import com.kjt.lms.service.MediaStorageService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,6 +48,10 @@ public class LessonServiceImpl extends BaseService implements LessonService {
     private final LessonMapper lessonMapper;
     private final MessageProvider messageProvider;
     private final MediaStorageService mediaStorageService;
+    private final QuizRepository quizRepository;
+    private final QuestionRepository questionRepository;
+    private final QuizAttemptRepository quizAttemptRepository;
+    private final QuizAnswerRepository quizAnswerRepository;
 
     @Override
     @Transactional
@@ -46,7 +59,7 @@ public class LessonServiceImpl extends BaseService implements LessonService {
         CourseEntity course = findActiveCourseById(courseId);
         validateCourseOwnership(course);
 
-        ChapterEntity chapter = findActiveChapterById(chapterId);
+        ChapterEntity chapter = findActiveChapterByIdForUpdate(chapterId);
         validateChapterBelongsToCourse(courseId, chapter);
 
         if (lessonRepository.existsByChapterIdAndTitleIgnoreCaseAndDeletedFalse(chapterId, request.getTitle())) {
@@ -101,10 +114,10 @@ public class LessonServiceImpl extends BaseService implements LessonService {
         CourseEntity course = findActiveCourseById(courseId);
         validateCourseOwnership(course);
 
-        ChapterEntity chapter = findActiveChapterById(chapterId);
+        ChapterEntity chapter = findActiveChapterByIdForUpdate(chapterId);
         validateChapterBelongsToCourse(courseId, chapter);
 
-        LessonEntity lesson = findActiveLessonById(lessonId);
+        LessonEntity lesson = findActiveLessonByIdForUpdate(lessonId);
         validateLessonBelongsToChapterAndCourse(courseId, chapterId, lesson);
 
         if (lessonRepository.existsByChapterIdAndTitleIgnoreCaseAndDeletedFalseAndIdNot(chapterId, request.getTitle(), lessonId)) {
@@ -125,13 +138,16 @@ public class LessonServiceImpl extends BaseService implements LessonService {
         CourseEntity course = findActiveCourseById(courseId);
         validateCourseOwnership(course);
 
-        ChapterEntity chapter = findActiveChapterById(chapterId);
+        ChapterEntity chapter = findActiveChapterByIdForUpdate(chapterId);
         validateChapterBelongsToCourse(courseId, chapter);
 
-        LessonEntity lesson = findActiveLessonById(lessonId);
+        LessonEntity lesson = findActiveLessonByIdForUpdate(lessonId);
         validateLessonBelongsToChapterAndCourse(courseId, chapterId, lesson);
 
+        softDeleteQuizGraph(quizRepository.findByLessonIdAndDeletedFalseOrderByCreatedAtAsc(lessonId));
+
         lesson.setDeleted(true);
+        lesson.setQuizId(null);
         lessonRepository.save(lesson);
 
         updateAggregateFields(course, chapter);
@@ -209,8 +225,20 @@ public class LessonServiceImpl extends BaseService implements LessonService {
                         messageProvider.getMessage("exception.chapter.notFound")));
     }
 
+    private ChapterEntity findActiveChapterByIdForUpdate(UUID chapterId) {
+        return chapterRepository.findByIdAndDeletedFalseForUpdate(chapterId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.chapter.notFound")));
+    }
+
     private LessonEntity findActiveLessonById(UUID lessonId) {
         return lessonRepository.findByIdAndDeletedFalse(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.lesson.notFound")));
+    }
+
+    private LessonEntity findActiveLessonByIdForUpdate(UUID lessonId) {
+        return lessonRepository.findByIdAndDeletedFalseForUpdate(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageProvider.getMessage("exception.lesson.notFound")));
     }
@@ -274,6 +302,45 @@ public class LessonServiceImpl extends BaseService implements LessonService {
             dto.setVideoPublicId(null);
             dto.setContent(null);
             dto.setQuizId(null);
+        }
+    }
+
+    private void softDeleteQuizGraph(List<QuizEntity> quizzes) {
+        if (quizzes == null || quizzes.isEmpty()) {
+            return;
+        }
+
+        quizzes.forEach(quiz -> quiz.setDeleted(true));
+        quizRepository.saveAll(quizzes);
+
+        List<QuestionEntity> allQuestions = new ArrayList<>();
+        List<QuizAttemptEntity> allAttempts = new ArrayList<>();
+        List<UUID> attemptIds = new ArrayList<>();
+
+        for (QuizEntity quiz : quizzes) {
+            allQuestions.addAll(questionRepository.findByQuizIdAndDeletedFalseOrderByCreatedAtAsc(quiz.getId()));
+
+            List<QuizAttemptEntity> attempts = quizAttemptRepository.findByQuizIdAndDeletedFalse(quiz.getId());
+            allAttempts.addAll(attempts);
+            attempts.forEach(attempt -> attemptIds.add(attempt.getId()));
+        }
+
+        if (!allQuestions.isEmpty()) {
+            allQuestions.forEach(question -> question.setDeleted(true));
+            questionRepository.saveAll(allQuestions);
+        }
+
+        if (!attemptIds.isEmpty()) {
+            List<QuizAnswerEntity> answers = quizAnswerRepository.findByAttemptIdInAndDeletedFalse(attemptIds);
+            if (!answers.isEmpty()) {
+                answers.forEach(answer -> answer.setDeleted(true));
+                quizAnswerRepository.saveAll(answers);
+            }
+        }
+
+        if (!allAttempts.isEmpty()) {
+            allAttempts.forEach(attempt -> attempt.setDeleted(true));
+            quizAttemptRepository.saveAll(allAttempts);
         }
     }
 }

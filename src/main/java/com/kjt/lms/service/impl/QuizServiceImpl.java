@@ -37,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -68,9 +69,10 @@ public class QuizServiceImpl extends BaseService implements QuizService {
             throw new BusinessException("Vui long chon chapter hoac bai hoc cho quiz");
         }
         validateChapterBelongsToCourse(request.getChapterId(), courseId);
-        LessonEntity lesson = validateLessonBelongsToCourse(request.getLessonId(), courseId);
+        LessonEntity lesson = validateLessonBelongsToCourseForUpdate(request.getLessonId(), courseId);
         UUID normalizedChapterId = resolveChapterId(request.getChapterId(), lesson);
         validateLessonChapterConsistency(lesson, normalizedChapterId);
+        validateNoActiveQuizBoundToLesson(lesson);
 
         QuizEntity quiz = QuizEntity.builder()
                 .courseId(courseId)
@@ -106,18 +108,7 @@ public class QuizServiceImpl extends BaseService implements QuizService {
     @Transactional
     public void deleteQuiz(UUID quizId) {
         QuizEntity quiz = getOwnedQuiz(quizId);
-        quiz.setDeleted(true);
-        quizRepository.save(quiz);
-
-        if (quiz.getLessonId() != null) {
-            lessonRepository.findByIdAndDeletedFalse(quiz.getLessonId())
-                    .ifPresent(lesson -> {
-                        if (quiz.getId().equals(lesson.getQuizId())) {
-                            lesson.setQuizId(null);
-                            lessonRepository.save(lesson);
-                        }
-                    });
-        }
+        softDeleteQuizGraph(List.of(quiz));
     }
 
     @Override
@@ -282,11 +273,11 @@ public class QuizServiceImpl extends BaseService implements QuizService {
                 .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.quiz.question.notFound")));
     }
 
-    private LessonEntity validateLessonBelongsToCourse(UUID lessonId, UUID courseId) {
+    private LessonEntity validateLessonBelongsToCourseForUpdate(UUID lessonId, UUID courseId) {
         if (lessonId == null) {
             return null;
         }
-        LessonEntity lesson = lessonRepository.findByIdAndDeletedFalse(lessonId)
+        LessonEntity lesson = lessonRepository.findByIdAndDeletedFalseForUpdate(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.lesson.notFound")));
         if (!courseId.equals(lesson.getCourseId())) {
             throw new BusinessException(messageProvider.getMessage("exception.lesson.notBelongToCourse"));
@@ -325,11 +316,75 @@ public class QuizServiceImpl extends BaseService implements QuizService {
         if (lessonId == null) {
             return;
         }
-        lessonRepository.findByIdAndDeletedFalse(lessonId)
+        lessonRepository.findByIdAndDeletedFalseForUpdate(lessonId)
                 .ifPresent(lesson -> {
                     lesson.setQuizId(quizId);
                     lessonRepository.save(lesson);
                 });
+    }
+
+    private void validateNoActiveQuizBoundToLesson(LessonEntity lesson) {
+        if (lesson == null) {
+            return;
+        }
+
+        if (lesson.getQuizId() != null
+                && quizRepository.findByIdAndDeletedFalse(lesson.getQuizId()).isPresent()) {
+            throw new BusinessException("Bai hoc da co quiz dang hoat dong");
+        }
+
+        if (quizRepository.existsByLessonIdAndDeletedFalse(lesson.getId())) {
+            throw new BusinessException("Bai hoc da co quiz dang hoat dong");
+        }
+    }
+
+    private void softDeleteQuizGraph(List<QuizEntity> quizzes) {
+        if (quizzes == null || quizzes.isEmpty()) {
+            return;
+        }
+
+        quizzes.forEach(quiz -> quiz.setDeleted(true));
+        quizRepository.saveAll(quizzes);
+
+        List<QuestionEntity> allQuestions = new ArrayList<>();
+        List<QuizAttemptEntity> allAttempts = new ArrayList<>();
+        List<UUID> attemptIds = new ArrayList<>();
+
+        for (QuizEntity quiz : quizzes) {
+            allQuestions.addAll(questionRepository.findByQuizIdAndDeletedFalseOrderByCreatedAtAsc(quiz.getId()));
+
+            List<QuizAttemptEntity> attempts = quizAttemptRepository.findByQuizIdAndDeletedFalse(quiz.getId());
+            allAttempts.addAll(attempts);
+            attempts.forEach(attempt -> attemptIds.add(attempt.getId()));
+
+            if (quiz.getLessonId() != null) {
+                lessonRepository.findByIdAndDeletedFalseForUpdate(quiz.getLessonId())
+                        .ifPresent(lesson -> {
+                            if (quiz.getId().equals(lesson.getQuizId())) {
+                                lesson.setQuizId(null);
+                                lessonRepository.save(lesson);
+                            }
+                        });
+            }
+        }
+
+        if (!allQuestions.isEmpty()) {
+            allQuestions.forEach(question -> question.setDeleted(true));
+            questionRepository.saveAll(allQuestions);
+        }
+
+        if (!attemptIds.isEmpty()) {
+            List<QuizAnswerEntity> answers = quizAnswerRepository.findByAttemptIdInAndDeletedFalse(attemptIds);
+            if (!answers.isEmpty()) {
+                answers.forEach(answer -> answer.setDeleted(true));
+                quizAnswerRepository.saveAll(answers);
+            }
+        }
+
+        if (!allAttempts.isEmpty()) {
+            allAttempts.forEach(attempt -> attempt.setDeleted(true));
+            quizAttemptRepository.saveAll(allAttempts);
+        }
     }
 
     private void validateCanViewCourseQuiz(CourseEntity course) {

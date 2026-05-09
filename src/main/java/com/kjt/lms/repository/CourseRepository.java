@@ -6,9 +6,11 @@ import com.kjt.lms.common.constants.CourseStatusEnum;
 import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.response.course.CourseCreateResponseDto;
 import com.kjt.lms.model.response.course.CourseListItemResponseDto;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -21,6 +23,15 @@ import java.util.UUID;
 public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
 
     Optional<CourseEntity> findByIdAndDeletedFalse(UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT c
+            FROM CourseEntity c
+            WHERE c.id = :id
+              AND c.deleted = false
+            """)
+    Optional<CourseEntity> findByIdAndDeletedFalseForUpdate(@Param("id") UUID id);
 
     @Query("""
             SELECT new com.kjt.lms.model.response.course.CourseListItemResponseDto(

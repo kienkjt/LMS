@@ -1,7 +1,9 @@
 package com.kjt.lms.repository;
 
 import com.kjt.lms.model.entity.LessonEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,6 +16,15 @@ import java.util.UUID;
 public interface LessonRepository extends JpaRepository<LessonEntity, UUID> {
 
     Optional<LessonEntity> findByIdAndDeletedFalse(UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+    SELECT l
+    FROM LessonEntity l
+    WHERE l.id = :id
+      AND l.deleted = false
+    """)
+    Optional<LessonEntity> findByIdAndDeletedFalseForUpdate(@Param("id") UUID id);
 
     List<LessonEntity> findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(UUID courseId);
 

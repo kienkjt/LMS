@@ -12,6 +12,10 @@ import com.kjt.lms.mapper.CourseMapper;
 import com.kjt.lms.model.entity.ChapterEntity;
 import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.LessonEntity;
+import com.kjt.lms.model.entity.QuestionEntity;
+import com.kjt.lms.model.entity.QuizAnswerEntity;
+import com.kjt.lms.model.entity.QuizAttemptEntity;
+import com.kjt.lms.model.entity.QuizEntity;
 import com.kjt.lms.model.request.course.CreateCourseRequestDto;
 import com.kjt.lms.model.request.course.SearchCourseRequest;
 import com.kjt.lms.model.request.course.UpdateCourseRequestDto;
@@ -27,6 +31,10 @@ import com.kjt.lms.repository.ChapterRepository;
 import com.kjt.lms.repository.CourseRepository;
 import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonRepository;
+import com.kjt.lms.repository.QuestionRepository;
+import com.kjt.lms.repository.QuizAnswerRepository;
+import com.kjt.lms.repository.QuizAttemptRepository;
+import com.kjt.lms.repository.QuizRepository;
 import com.kjt.lms.service.CourseService;
 import com.kjt.lms.service.MediaStorageService;
 import com.kjt.lms.service.NotificationService;
@@ -39,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +66,10 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     private final CategoryRepository categoryRepository;
     private final ChapterRepository chapterRepository;
     private final LessonRepository lessonRepository;
+    private final QuizRepository quizRepository;
+    private final QuestionRepository questionRepository;
+    private final QuizAttemptRepository quizAttemptRepository;
+    private final QuizAnswerRepository quizAnswerRepository;
     private final CourseMapper courseMapper;
     private final MessageProvider messageProvider;
     private final MediaStorageService mediaStorageService;
@@ -203,10 +216,27 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     @Override
     @Transactional
     public void deleteCourse(UUID courseId) {
-        CourseEntity course = getOwnedCourse(courseId);
+        CourseEntity course = getOwnedCourseForUpdate(courseId);
 
         course.setDeleted(true);
         courseRepository.save(course);
+
+        List<ChapterEntity> chapters = chapterRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(courseId);
+        if (!chapters.isEmpty()) {
+            chapters.forEach(chapter -> chapter.setDeleted(true));
+            chapterRepository.saveAll(chapters);
+        }
+
+        List<LessonEntity> lessons = lessonRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(courseId);
+        if (!lessons.isEmpty()) {
+            lessons.forEach(lesson -> {
+                lesson.setDeleted(true);
+                lesson.setQuizId(null);
+            });
+            lessonRepository.saveAll(lessons);
+        }
+
+        softDeleteQuizGraph(quizRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(courseId));
 
         log.info("Course deleted: {} by instructor: {}", courseId, securityUtils.getCurrentUserId());
     }
@@ -413,6 +443,14 @@ public class CourseServiceImpl extends BaseService implements CourseService {
         return course;
     }
 
+    private CourseEntity getOwnedCourseForUpdate(UUID courseId) {
+        CourseEntity course = courseRepository.findByIdAndDeletedFalseForUpdate(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.course.notFound")));
+        validateCourseOwnership(course);
+        return course;
+    }
+
     private CourseEntity getAccessibleCourse(UUID courseId) {
         CourseEntity course = findActiveCourseById(courseId);
         if (securityUtils.isAdmin()) {
@@ -493,5 +531,43 @@ public class CourseServiceImpl extends BaseService implements CourseService {
             log.warn("Could not extract public ID from URL: {}", cloudinaryUrl);
         }
         return null;
+    }
+
+    private void softDeleteQuizGraph(List<QuizEntity> quizzes) {
+        if (quizzes == null || quizzes.isEmpty()) {
+            return;
+        }
+
+        quizzes.forEach(quiz -> quiz.setDeleted(true));
+        quizRepository.saveAll(quizzes);
+
+        List<QuestionEntity> allQuestions = new ArrayList<>();
+        List<QuizAttemptEntity> allAttempts = new ArrayList<>();
+        List<UUID> attemptIds = new ArrayList<>();
+
+        for (QuizEntity quiz : quizzes) {
+            allQuestions.addAll(questionRepository.findByQuizIdAndDeletedFalseOrderByCreatedAtAsc(quiz.getId()));
+            List<QuizAttemptEntity> attempts = quizAttemptRepository.findByQuizIdAndDeletedFalse(quiz.getId());
+            allAttempts.addAll(attempts);
+            attempts.forEach(attempt -> attemptIds.add(attempt.getId()));
+        }
+
+        if (!allQuestions.isEmpty()) {
+            allQuestions.forEach(question -> question.setDeleted(true));
+            questionRepository.saveAll(allQuestions);
+        }
+
+        if (!attemptIds.isEmpty()) {
+            List<QuizAnswerEntity> answers = quizAnswerRepository.findByAttemptIdInAndDeletedFalse(attemptIds);
+            if (!answers.isEmpty()) {
+                answers.forEach(answer -> answer.setDeleted(true));
+                quizAnswerRepository.saveAll(answers);
+            }
+        }
+
+        if (!allAttempts.isEmpty()) {
+            allAttempts.forEach(attempt -> attempt.setDeleted(true));
+            quizAttemptRepository.saveAll(allAttempts);
+        }
     }
 }

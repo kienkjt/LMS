@@ -17,6 +17,8 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttemptEntity, 
 
     List<QuizAttemptEntity> findByStudentIdAndQuizIdAndDeletedFalseOrderByAttemptNumberDesc(UUID studentId, UUID quizId);
 
+    List<QuizAttemptEntity> findByQuizIdAndDeletedFalse(UUID quizId);
+
     long countByStudentIdAndQuizIdAndDeletedFalse(UUID studentId, UUID quizId);
 
     boolean existsByStudentIdAndQuizIdAndPassedTrueAndDeletedFalse(UUID studentId, UUID quizId);

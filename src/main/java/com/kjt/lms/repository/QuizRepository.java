@@ -19,5 +19,7 @@ public interface QuizRepository extends JpaRepository<QuizEntity, UUID> {
 
     List<QuizEntity> findByChapterIdAndDeletedFalseOrderByCreatedAtAsc(UUID chapterId);
 
+    boolean existsByLessonIdAndDeletedFalse(UUID lessonId);
+
     long countByCourseIdAndDeletedFalse(UUID courseId);
 }
