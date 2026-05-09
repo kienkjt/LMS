@@ -10,6 +10,10 @@ import com.kjt.lms.mapper.LessonMapper;
 import com.kjt.lms.model.entity.ChapterEntity;
 import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.LessonEntity;
+import com.kjt.lms.model.entity.QuestionEntity;
+import com.kjt.lms.model.entity.QuizAnswerEntity;
+import com.kjt.lms.model.entity.QuizAttemptEntity;
+import com.kjt.lms.model.entity.QuizEntity;
 import com.kjt.lms.model.request.chapter.CreateChapterRequestDto;
 import com.kjt.lms.model.request.chapter.UpdateChapterRequestDto;
 import com.kjt.lms.model.response.chapter.ChapterResponseDto;
@@ -21,6 +25,8 @@ import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonRepository;
 import com.kjt.lms.repository.QuestionRepository;
 import com.kjt.lms.repository.QuizRepository;
+import com.kjt.lms.repository.QuizAnswerRepository;
+import com.kjt.lms.repository.QuizAttemptRepository;
 import com.kjt.lms.service.ChapterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +50,8 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
     private final LessonRepository lessonRepository;
     private final QuizRepository quizRepository;
     private final QuestionRepository questionRepository;
+    private final QuizAttemptRepository quizAttemptRepository;
+    private final QuizAnswerRepository quizAnswerRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final ChapterMapper chapterMapper;
     private final LessonMapper lessonMapper;
@@ -51,7 +60,7 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
     @Override
     @Transactional
     public ChapterResponseDto createChapter(UUID courseId, CreateChapterRequestDto request) {
-        CourseEntity course = findActiveCourseById(courseId);
+        CourseEntity course = findActiveCourseByIdForUpdate(courseId);
         validateCourseOwnership(course);
 
         if (chapterRepository.existsByCourseIdAndTitleIgnoreCaseAndDeletedFalse(courseId, request.getTitle())) {
@@ -119,7 +128,7 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
     @Override
     @Transactional
     public ChapterResponseDto updateChapter(UUID courseId, UUID chapterId, UpdateChapterRequestDto request) {
-        CourseEntity course = findActiveCourseById(courseId);
+        CourseEntity course = findActiveCourseByIdForUpdate(courseId);
         validateCourseOwnership(course);
 
         ChapterEntity chapter = findActiveChapterById(chapterId);
@@ -143,10 +152,10 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
     @Override
     @Transactional
     public void deleteChapter(UUID courseId, UUID chapterId) {
-        CourseEntity course = findActiveCourseById(courseId);
+        CourseEntity course = findActiveCourseByIdForUpdate(courseId);
         validateCourseOwnership(course);
 
-        ChapterEntity chapter = findActiveChapterById(chapterId);
+        ChapterEntity chapter = findActiveChapterByIdForUpdate(chapterId);
         validateChapterBelongsToCourse(courseId, chapter);
 
         chapter.setDeleted(true);
@@ -157,6 +166,9 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
             lessons.forEach(lesson -> lesson.setDeleted(true));
             lessonRepository.saveAll(lessons);
         }
+
+        List<QuizEntity> chapterQuizzes = quizRepository.findByChapterIdAndDeletedFalseOrderByCreatedAtAsc(chapterId);
+        softDeleteQuizGraph(chapterQuizzes);
 
         updateCourseAggregateFields(course);
 
@@ -221,6 +233,18 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
                         messageProvider.getMessage("exception.chapter.notFound")));
     }
 
+    private ChapterEntity findActiveChapterByIdForUpdate(UUID chapterId) {
+        return chapterRepository.findByIdAndDeletedFalseForUpdate(chapterId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.chapter.notFound")));
+    }
+
+    private CourseEntity findActiveCourseByIdForUpdate(UUID courseId) {
+        return courseRepository.findByIdAndDeletedFalseForUpdate(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageProvider.getMessage("exception.course.notFound")));
+    }
+
     private void updateCourseAggregateFields(CourseEntity course) {
         course.setTotalLessons(Math.toIntExact(lessonRepository.countByCourseIdAndDeletedFalse(course.getId())));
         course.setTotalDuration(lessonRepository.sumDurationByCourseId(course.getId()));
@@ -269,5 +293,43 @@ public class ChapterServiceImpl extends BaseService implements ChapterService {
                 .createdAt(quiz.getCreatedAt())
                 .questions(questions)
                 .build();
+    }
+
+    private void softDeleteQuizGraph(List<QuizEntity> quizzes) {
+        if (quizzes == null || quizzes.isEmpty()) {
+            return;
+        }
+
+        quizzes.forEach(quiz -> quiz.setDeleted(true));
+        quizRepository.saveAll(quizzes);
+
+        List<QuestionEntity> allQuestions = new ArrayList<>();
+        List<QuizAttemptEntity> allAttempts = new ArrayList<>();
+        List<UUID> attemptIds = new ArrayList<>();
+
+        for (QuizEntity quiz : quizzes) {
+            allQuestions.addAll(questionRepository.findByQuizIdAndDeletedFalseOrderByCreatedAtAsc(quiz.getId()));
+            List<QuizAttemptEntity> attempts = quizAttemptRepository.findByQuizIdAndDeletedFalse(quiz.getId());
+            allAttempts.addAll(attempts);
+            attempts.forEach(attempt -> attemptIds.add(attempt.getId()));
+        }
+
+        if (!allQuestions.isEmpty()) {
+            allQuestions.forEach(question -> question.setDeleted(true));
+            questionRepository.saveAll(allQuestions);
+        }
+
+        if (!attemptIds.isEmpty()) {
+            List<QuizAnswerEntity> answers = quizAnswerRepository.findByAttemptIdInAndDeletedFalse(attemptIds);
+            if (!answers.isEmpty()) {
+                answers.forEach(answer -> answer.setDeleted(true));
+                quizAnswerRepository.saveAll(answers);
+            }
+        }
+
+        if (!allAttempts.isEmpty()) {
+            allAttempts.forEach(attempt -> attempt.setDeleted(true));
+            quizAttemptRepository.saveAll(allAttempts);
+        }
     }
 }

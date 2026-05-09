@@ -10,12 +10,12 @@ RUN mvn -B -ntp clean package -DskipTests && cp target/*.jar target/application.
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Default to production profile in container, can be overridden at runtime.
+# Default profile
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS=""
 
 COPY --from=build /app/target/application.jar app.jar
 
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
 
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

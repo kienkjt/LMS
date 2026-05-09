@@ -28,6 +28,9 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.name:LMS System}")
     private String appName;
 
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
+
     @Override
     @Async
     public void sendOtpEmail(String email, String otpCode, String purpose) {
@@ -69,6 +72,7 @@ public class EmailServiceImpl implements EmailService {
             Context context = new Context();
             context.setVariable("fullName", fullName);
             context.setVariable("appName", appName);
+            context.setVariable("frontendUrl", frontendUrl);
 
             String htmlContent = templateEngine.process("emails/welcome", context);
 

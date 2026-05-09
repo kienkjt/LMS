@@ -47,6 +47,23 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+app:
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
+  name: LMS System
+  profile:
+    avatar:
+          max-size-bytes: 5242880
+          allowed-content-types: image/jpeg,image/png,image/webp
+  media:
+    course-image:
+          max-size-bytes: 52428800
+          allowed-content-types: image/jpeg,image/png,image/webp
+    course-video:
+          max-size-bytes: 5368709120
+          allowed-content-types: video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/x-flv
+  certificate:
+    storage-dir: certificates
+
 jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION}
@@ -97,21 +114,6 @@ vnpay:
   currency-code: ${VNPAY_CURRENCY:VND}
   expire-minutes: ${VNPAY_EXPIRE_MINUTES:15}
 
-app:
-  name: LMS System
-  profile:
-    avatar:
-      max-size-bytes: 5242880
-      allowed-content-types: image/jpeg,image/png,image/webp
-  media:
-    course-image:
-      max-size-bytes: 52428800
-      allowed-content-types: image/jpeg,image/png,image/webp
-    course-video:
-      max-size-bytes: 5368709120
-      allowed-content-types: video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/x-flv
-  certificate:
-    storage-dir: certificates
 
 gemini:
   api-key: ${GEMINI_API_KEY:}
