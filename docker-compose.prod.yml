@@ -1,4 +1,5 @@
 services:
+
   redis:
     image: redis:7-alpine
     container_name: lms-redis
@@ -11,7 +12,7 @@ services:
         "--bind",
         "0.0.0.0",
         "--protected-mode",
-        "yes"
+        "no"
       ]
     volumes:
       - redis_data:/data
@@ -24,17 +25,23 @@ services:
       dockerfile: Dockerfile
     container_name: lms-backend
     restart: unless-stopped
+
     depends_on:
       - redis
+
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
+
     networks:
       - lms-network
+
     environment:
+
+      # Spring
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8080
 
-      # Railway MySQL
+      # Database (Railway MySQL)
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
@@ -44,7 +51,7 @@ services:
       REDIS_PORT: 6379
 
       # Frontend + CORS
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:4200,http://localhost:5173}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:4200,http://localhost:5173,https://lms-fe-self.vercel.app}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-http://localhost:3000}
 
       # Mail
@@ -83,7 +90,7 @@ services:
       VNPAY_TMN_CODE: ${VNPAY_TMN_CODE}
       VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET}
 
-      # Gemini AI
+      # Gemini
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL}
