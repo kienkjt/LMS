@@ -61,6 +61,7 @@ public class EnrollmentServiceImpl extends BaseService implements EnrollmentServ
         EnrollmentEntity enrollment = enrollmentMapper.toCreateEntity(studentId, course.getId());
 
         EnrollmentEntity savedEnrollment = enrollmentRepository.save(enrollment);
+        syncCourseStudentCount(course);
         log.info("Student {} enrolled course {}", studentId, course.getId());
         return enrollmentMapper.toResponse(savedEnrollment);
     }
@@ -70,6 +71,12 @@ public class EnrollmentServiceImpl extends BaseService implements EnrollmentServ
                 ? course.getDiscountPrice()
                 : course.getPrice();
         return effectivePrice == null || effectivePrice.compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    private void syncCourseStudentCount(CourseEntity course) {
+        long enrolledCount = enrollmentRepository.countByCourseIdAndDeletedFalse(course.getId());
+        course.setTotalStudents((int) enrolledCount);
+        courseRepository.save(course);
     }
 
     @Override

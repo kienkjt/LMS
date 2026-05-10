@@ -10,12 +10,14 @@ import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
 import com.kjt.lms.mapper.OrderMapper;
 import com.kjt.lms.model.entity.EnrollmentEntity;
+import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.OrderEntity;
 import com.kjt.lms.model.entity.OrderItemEntity;
 import com.kjt.lms.model.request.order.InitPaymentRequestDto;
 import com.kjt.lms.model.request.order.PayOrderRequestDto;
 import com.kjt.lms.model.response.order.OrderResponseDto;
 import com.kjt.lms.repository.EnrollmentRepository;
+import com.kjt.lms.repository.CourseRepository;
 import com.kjt.lms.repository.OrderItemRepository;
 import com.kjt.lms.repository.OrderRepository;
 import com.kjt.lms.service.NotificationService;
@@ -54,6 +56,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final CourseRepository courseRepository;
     private final SecurityUtils securityUtils;
     private final MessageProvider messageProvider;
     private final OrderMapper orderMapper;
@@ -429,7 +432,19 @@ public class PaymentServiceImpl implements PaymentService {
                     .certificateIssued(false)
                     .build();
             enrollmentRepository.save(enrollment);
+            syncCourseStudentCount(item.getCourseId());
         }
+    }
+
+    private void syncCourseStudentCount(UUID courseId) {
+        CourseEntity course = courseRepository.findByIdAndDeletedFalse(courseId).orElse(null);
+        if (course == null) {
+            return;
+        }
+
+        long enrolledCount = enrollmentRepository.countByCourseIdAndDeletedFalse(courseId);
+        course.setTotalStudents((int) enrolledCount);
+        courseRepository.save(course);
     }
 
     private OrderResponseDto mapToDto(OrderEntity order) {

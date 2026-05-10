@@ -7,10 +7,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 
 import java.nio.file.AccessDeniedException;
 import java.util.HashMap;
@@ -34,12 +36,40 @@ public class GlobalExceptionHandler {
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
+        String firstErrorMessage = errors.values().stream().findFirst().orElse("Validation failed");
 
         log.error("Validation error at {}: {}", request.getRequestURI(), errors);
 
         APIResponse<Map<String, String>> response = APIResponse.error(
                 HttpStatus.BAD_REQUEST.value(),
-                "Validation failed",
+                firstErrorMessage,
+                errors
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Handle validation errors on request params/path vars
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<APIResponse<Map<String, String>>> handleConstraintViolationException(
+            ConstraintViolationException ex,
+            HttpServletRequest request) {
+
+        Map<String, String> errors = new HashMap<>();
+        for (ConstraintViolation<?> violation : ex.getConstraintViolations()) {
+            String path = violation.getPropertyPath() == null ? "request" : violation.getPropertyPath().toString();
+            String fieldName = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+            errors.put(fieldName, violation.getMessage());
+        }
+        String firstErrorMessage = errors.values().stream().findFirst().orElse("Validation failed");
+
+        log.error("Constraint violation at {}: {}", request.getRequestURI(), errors);
+
+        APIResponse<Map<String, String>> response = APIResponse.error(
+                HttpStatus.BAD_REQUEST.value(),
+                firstErrorMessage,
                 errors
         );
 
