@@ -16,23 +16,26 @@ import java.math.BigDecimal;
 @Builder
 @Data
 public class CreateWithdrawalRequestDto {
-    private String reason;
-    @Size(max = 500, message = "{validation.withdrawalRequest.reason.size}")
 
-    private String accountHolder;
+    @Size(max = 500, message = "{validation.withdrawalRequest.reason.size}")
+    private String reason;
+
     @Size(min = 2, max = 100, message = "{validation.withdrawalRequest.accountHolder.size}")
     @NotBlank(message = "{validation.withdrawalRequest.accountHolder.notBlank}")
+    private String accountHolder;
 
-    private String bankName;
     @Size(min = 2, max = 100, message = "{validation.withdrawalRequest.bankName.size}")
     @NotBlank(message = "{validation.withdrawalRequest.bankName.notBlank}")
+    private String bankName;
 
-    private String bankAccount;
     @Size(min = 8, max = 50, message = "{validation.withdrawalRequest.bankAccount.size}")
     @NotBlank(message = "{validation.withdrawalRequest.bankAccount.notBlank}")
+    private String bankAccount;
 
-    @DecimalMin(value = "0.01", message = "{validation.withdrawalRequest.requestedAmount.min}")
     @NotNull(message = "{validation.withdrawalRequest.requestedAmount.notNull}")
+    @DecimalMin(
+            value = "0.01",
+            message = "{validation.withdrawalRequest.requestedAmount.min}"
+    )
     private BigDecimal requestedAmount;
-
 }
