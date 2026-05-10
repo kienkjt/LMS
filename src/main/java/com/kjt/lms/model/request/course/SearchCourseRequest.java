@@ -9,6 +9,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,4 +21,7 @@ public class SearchCourseRequest {
     private CommonStatusEnum active;
     private CourseStatusEnum courseStatus;
     private CourseLevelEnum courseLevel;
+    private UUID categoryId;
+    private BigDecimal priceMin;
+    private BigDecimal priceMax;
 }

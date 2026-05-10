@@ -159,6 +159,10 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
         FROM CourseEntity c
         LEFT JOIN UserEntity u ON u.id = c.instructorId
         WHERE (:keyword IS NULL OR :keyword = '' OR LOWER(c.title) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (:categoryId IS NULL OR c.categoryId = :categoryId)
+            AND (:courseLevel IS NULL OR c.level = :courseLevel)
+            AND (:priceMin IS NULL OR COALESCE(c.discountPrice, c.price) >= :priceMin)
+            AND (:priceMax IS NULL OR COALESCE(c.discountPrice, c.price) <= :priceMax)
             AND c.status IN :statuses
             AND c.active = :active
             AND c.deleted = false
@@ -166,6 +170,10 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
     """)
     Page<CourseListItemResponseDto> searchPublicWithInstructorName(
             @Param("keyword") String keyword,
+            @Param("categoryId") UUID categoryId,
+            @Param("courseLevel") CourseLevelEnum courseLevel,
+            @Param("priceMin") java.math.BigDecimal priceMin,
+            @Param("priceMax") java.math.BigDecimal priceMax,
             @Param("statuses") Collection<CourseStatusEnum> statuses,
             @Param("active") CommonStatusEnum active,
             Pageable pageable

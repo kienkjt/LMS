@@ -123,6 +123,10 @@ public class CourseServiceImpl extends BaseService implements CourseService {
 
         Page<CourseListItemResponseDto> results = courseRepository.searchPublicWithInstructorName(
                 normalizedRequest.getKeyword(),
+                normalizedRequest.getCategoryId(),
+                normalizedRequest.getCourseLevel(),
+                normalizedRequest.getPriceMin(),
+                normalizedRequest.getPriceMax(),
                 PUBLIC_VISIBLE_STATUSES,
                 CommonStatusEnum.ACTIVE,
                 pageable
