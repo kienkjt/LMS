@@ -29,9 +29,11 @@ public class CreateCourseRequestDto {
 
     @NotNull(message = "{validation.price.notNull}")
     @DecimalMin(value = "0.0", message = "{validation.price.min}")
+    @DecimalMax(value = "999999999.99", message = "{validation.price.max}")
     private BigDecimal price;
 
     @DecimalMin(value = "0.0", message = "{validation.discountPrice.min}")
+    @DecimalMax(value = "999999999.99", message = "{validation.discountPrice.max}")
     private BigDecimal discountPrice;
 
     @NotNull(message = "{validation.level.notNull}")
