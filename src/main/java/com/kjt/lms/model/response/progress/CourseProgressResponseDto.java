@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -18,5 +19,6 @@ public class CourseProgressResponseDto {
     private long totalLessons;
     private long completedLessons;
     private BigDecimal progressPercent;
+    private List<UUID> completedLessonIds;
 }
 

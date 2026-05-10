@@ -83,6 +83,8 @@ public class LessonProgressServiceImpl extends BaseService implements LessonProg
 
         if (progress.getProgressPercent().compareTo(new BigDecimal("100.00")) >= 0) {
             enrollment.setCompletedAt(LocalDateTime.now());
+        } else {
+            enrollment.setCompletedAt(null);
         }
 
         enrollmentRepository.save(enrollment);
@@ -200,6 +202,8 @@ public class LessonProgressServiceImpl extends BaseService implements LessonProg
         long totalLessons = lessonRepository.countByCourseIdAndDeletedFalse(courseId);
         long completedLessons = lessonProgressRepository
                 .countByStudentIdAndCourseIdAndCompletedTrueAndDeletedFalse(studentId, courseId);
+        List<UUID> completedLessonIds = lessonProgressRepository
+                .findCompletedLessonIdsByStudentIdAndCourseId(studentId, courseId);
 
         BigDecimal progressPercent = calculateProgressPercent(completedLessons, totalLessons);
 
@@ -208,6 +212,7 @@ public class LessonProgressServiceImpl extends BaseService implements LessonProg
                 .totalLessons(totalLessons)
                 .completedLessons(completedLessons)
                 .progressPercent(progressPercent)
+                .completedLessonIds(completedLessonIds)
                 .build();
     }
 

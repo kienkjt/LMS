@@ -20,6 +20,19 @@ public interface LessonProgressRepository extends JpaRepository<LessonProgressEn
     long countByStudentIdAndCourseIdAndCompletedTrueAndDeletedFalse(UUID studentId, UUID courseId);
 
     @Query("""
+            SELECT lp.lessonId
+            FROM LessonProgressEntity lp
+            WHERE lp.deleted = false
+              AND lp.studentId = :studentId
+              AND lp.courseId = :courseId
+              AND lp.completed = true
+            """)
+    List<UUID> findCompletedLessonIdsByStudentIdAndCourseId(
+            @Param("studentId") UUID studentId,
+            @Param("courseId") UUID courseId
+    );
+
+    @Query("""
             SELECT FUNCTION('DATE', lp.completedAt) AS learningDate,
                    COUNT(lp) AS activityCount,
                    COALESCE(SUM(COALESCE(l.duration, 0)), 0) AS estimatedMinutes
