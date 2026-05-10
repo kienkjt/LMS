@@ -162,11 +162,12 @@ public class LearningAnalyticsServiceImpl extends BaseService implements Learnin
                 continue;
             }
 
-            String message = "Bạn sắp mất chuỗi học " + streak.currentStreak + " ngày liên tiếp!";
+            String title = messageProvider.getMessage("notification.streak.warning.title");
+            String message = messageProvider.getMessage("notification.streak.warning.message", streak.currentStreak);
             notificationService.notifyUser(
                     studentId,
                     NotificationTypeEnum.SYSTEM,
-                    "Cảnh báo mất streak",
+                    title,
                     message,
                     null,
                     referenceType
@@ -176,7 +177,7 @@ public class LearningAnalyticsServiceImpl extends BaseService implements Learnin
                     emailService.sendSystemNotificationEmail(
                             user.getEmail(),
                             user.getFullName(),
-                            "Cảnh báo streak học tập",
+                            title,
                             message
                     )
             );

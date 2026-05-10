@@ -259,8 +259,8 @@ public class CourseServiceImpl extends BaseService implements CourseService {
         notificationService.notifyUser(
                 course.getInstructorId(),
                 NotificationTypeEnum.COURSE_APPROVED,
-                "Course approved",
-                "Your course \"" + course.getTitle() + "\" has been approved.",
+                messageProvider.getMessage("notification.course.approved.title"),
+                messageProvider.getMessage("notification.course.approved.message", course.getTitle()),
                 course.getId(),
                 "COURSE"
         );

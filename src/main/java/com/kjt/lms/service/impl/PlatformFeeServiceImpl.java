@@ -76,9 +76,8 @@ public class PlatformFeeServiceImpl extends BaseService implements PlatformFeeSe
 
     private void notifyInstructors(BigDecimal platformFeePercent) {
         BigDecimal instructorPercent = ONE_HUNDRED.subtract(platformFeePercent).setScale(2, RoundingMode.HALF_UP);
-        String title = "Cập nhật phí nền tảng";
-        String message = String.format(
-                "Phí nền tảng đã cập nhật thành %s%%. Tỷ lệ doanh thu của giảng viên hiện là %s%% cho các đơn hàng mới.",
+        String title = messageProvider.getMessage("notification.platform.fee.updated.title");
+        String message = messageProvider.getMessage("notification.platform.fee.updated.message",
                 platformFeePercent.toPlainString(),
                 instructorPercent.toPlainString()
         );
