@@ -7,17 +7,19 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
 import java.util.UUID;
 
 @Getter
 @Setter
 public class CreateNotificationRequestDto {
 
-    @NotNull
-    private UUID userId;
+    private UUID userId; // id của người nhận thông báo (cho 1 người)
+
+    private List<UUID> userIds; // danh sách các user nhận thông báo (cho nhiều người)
 
     @NotNull
-    private NotificationTypeEnum type;
+    private NotificationTypeEnum type; // loại thông báo (ví dụ: COURSE_UPDATE, NEW_COURSE, etc.)
 
     @NotBlank
     @Size(max = 200)
@@ -25,9 +27,4 @@ public class CreateNotificationRequestDto {
 
     @NotBlank
     private String message;
-
-    private UUID referenceId;
-
-    @Size(max = 50)
-    private String referenceType;
 }

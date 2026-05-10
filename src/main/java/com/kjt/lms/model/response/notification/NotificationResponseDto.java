@@ -20,7 +20,5 @@ public class NotificationResponseDto {
     private String message;
     private Boolean read;
     private LocalDateTime readAt;
-    private UUID referenceId;
-    private String referenceType;
     private LocalDateTime createdAt;
 }

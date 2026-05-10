@@ -18,7 +18,7 @@ public interface NotificationService {
 
     int markAllAsRead();
 
-    NotificationResponseDto createNotification(CreateNotificationRequestDto request);
+    Object createNotification(CreateNotificationRequestDto request);
 
     void notifyUser(UUID userId, NotificationTypeEnum type, String title, String message, UUID referenceId, String referenceType);
 }

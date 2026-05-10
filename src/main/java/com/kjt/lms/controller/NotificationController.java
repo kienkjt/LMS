@@ -67,8 +67,8 @@ public class NotificationController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Create a notification for a user (Admin only)", security = @SecurityRequirement(name = "Bearer"))
-    public ResponseEntity<APIResponse<NotificationResponseDto>> createNotification(
+    @Operation(summary = "Create notification(s) - Send to single user (userId) or multiple users (userIds). Admin only", security = @SecurityRequirement(name = "Bearer"))
+    public ResponseEntity<APIResponse<Object>> createNotification(
             @Valid @RequestBody CreateNotificationRequestDto request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(APIResponse.success(notificationService.createNotification(request), null));

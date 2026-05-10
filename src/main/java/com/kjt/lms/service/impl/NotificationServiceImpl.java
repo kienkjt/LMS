@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -61,15 +63,44 @@ public class NotificationServiceImpl extends BaseService implements Notification
 
     @Override
     @Transactional
-    public NotificationResponseDto createNotification(CreateNotificationRequestDto request) {
-        return toResponse(saveNotification(
-                request.getUserId(),
-                request.getType(),
-                request.getTitle(),
-                request.getMessage(),
-                request.getReferenceId(),
-                request.getReferenceType()
-        ));
+    public Object createNotification(CreateNotificationRequestDto request) {
+        if (request.getUserIds() != null && !request.getUserIds().isEmpty()) {
+            int totalCount = request.getUserIds().size();
+            int successCount = 0;
+            int failureCount = 0;
+
+            for (UUID userId : request.getUserIds()) {
+                try {
+                    if (userId != null) {
+                        saveNotification(
+                                userId,
+                                request.getType(),
+                                request.getTitle(),
+                                request.getMessage()
+                        );
+                        successCount++;
+                    }
+                } catch (Exception e) {
+                    failureCount++;
+                }
+            }
+
+            Map<String, Integer> response = new HashMap<>();
+            response.put("totalCount", totalCount);
+            response.put("successCount", successCount);
+            response.put("failureCount", failureCount);
+            return response;
+        }
+        else if (request.getUserId() != null) {
+            return toResponse(saveNotification(
+                    request.getUserId(),
+                    request.getType(),
+                    request.getTitle(),
+                    request.getMessage()
+            ));
+        }
+
+        throw new IllegalArgumentException("Either userId or userIds must be provided");
     }
 
     @Override
@@ -78,23 +109,19 @@ public class NotificationServiceImpl extends BaseService implements Notification
         if (userId == null) {
             return;
         }
-        saveNotification(userId, type, title, message, referenceId, referenceType);
+        saveNotification(userId, type, title, message);
     }
 
     private NotificationEntity saveNotification(
             UUID userId,
             NotificationTypeEnum type,
             String title,
-            String message,
-            UUID referenceId,
-            String referenceType) {
+            String message) {
         NotificationEntity notification = NotificationEntity.builder()
                 .userId(userId)
                 .type(type)
                 .title(title)
                 .message(message)
-                .referenceId(referenceId)
-                .referenceType(referenceType)
                 .build();
         return notificationRepository.save(notification);
     }
@@ -108,8 +135,6 @@ public class NotificationServiceImpl extends BaseService implements Notification
                 .message(notification.getMessage())
                 .read(notification.getRead())
                 .readAt(notification.getReadAt())
-                .referenceId(notification.getReferenceId())
-                .referenceType(notification.getReferenceType())
                 .createdAt(notification.getCreatedAt())
                 .build();
     }
