@@ -222,6 +222,13 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     public void deleteCourse(UUID courseId) {
         CourseEntity course = getOwnedCourseForUpdate(courseId);
 
+        // Check if there are enrolled students
+        long enrolledCount = enrollmentRepository.countByCourseIdAndDeletedFalse(courseId);
+        if (enrolledCount > 0) {
+            throw new BusinessException(
+                    messageProvider.getMessage("exception.course.hasEnrollments", enrolledCount));
+        }
+
         course.setDeleted(true);
         courseRepository.save(course);
 

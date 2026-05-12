@@ -2,10 +2,13 @@ package com.kjt.lms.service.impl;
 
 import com.kjt.lms.common.base.BaseService;
 import com.kjt.lms.common.constants.CommonStatusEnum;
+import com.kjt.lms.common.constants.NotificationTypeEnum;
+import com.kjt.lms.common.constants.WithdrawalStatusEnum;
 import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.exception.ResourceNotFoundException;
 import com.kjt.lms.model.entity.RoleEntity;
 import com.kjt.lms.model.entity.UserEntity;
+import com.kjt.lms.model.entity.EnrollmentEntity;
 import com.kjt.lms.model.request.admin.ListUserRequest;
 import com.kjt.lms.model.request.admin.UpdateUserStatusRequest;
 import com.kjt.lms.model.request.admin.LockUserRequest;
@@ -13,8 +16,12 @@ import com.kjt.lms.model.response.admin.UserListResponse;
 import com.kjt.lms.model.response.admin.UserDetailResponse;
 import com.kjt.lms.repository.RoleRepository;
 import com.kjt.lms.repository.UserRepository;
+import com.kjt.lms.repository.CourseRepository;
+import com.kjt.lms.repository.EnrollmentRepository;
+import com.kjt.lms.repository.WithdrawalRequestRepository;
 import com.kjt.lms.service.AdminUserService;
 import com.kjt.lms.service.EmailService;
+import com.kjt.lms.service.NotificationService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -36,6 +44,10 @@ public class AdminUserServiceImpl extends BaseService implements AdminUserServic
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final WithdrawalRequestRepository withdrawalRepository;
+    private final NotificationService notificationService;
     private final EmailService emailService;
 
     @Override
@@ -137,6 +149,20 @@ public class AdminUserServiceImpl extends BaseService implements AdminUserServic
         // Không cho phép xóa tài khoản của chính mình
         if (securityUtils.isCurrentUser(userId)) {
             throw new BusinessException("Bạn không thể xóa tài khoản của chính mình");
+        }
+
+        // Check if user has active courses (if teacher)
+        long courseCount = courseRepository.countByInstructorIdAndDeletedFalse(userId);
+        if (courseCount > 0) {
+            throw new BusinessException(
+                    messageProvider.getMessage("exception.user.hasCourses", courseCount));
+        }
+
+        // Check if user has active enrollments (if student)
+        List<EnrollmentEntity> enrollments = enrollmentRepository.findByStudentIdAndDeletedFalse(userId);
+        if (!enrollments.isEmpty()) {
+            throw new BusinessException(
+                    messageProvider.getMessage("exception.user.hasEnrollments", enrollments.size()));
         }
 
         user.setDeleted(true);

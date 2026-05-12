@@ -61,6 +61,8 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
                Sau do de xuat nguoi hoc can cung cap them thong tin nao.
             4) Uu tien tieng Viet, de hieu, chinh xac.
             5) Neu cau hoi ngoai pham vi hoc tap LMS (chinh tri, y te, tai chinh, noi dung khong lien quan), lich su tu choi.
+            6) Neu cau hoi mo ho hoac thieu thong tin, dat toi da 2 cau hoi lam ro truoc khi ket luan.
+            7) Van phong than thien, chuyen nghiep; tra loi ngan gon neu nguoi dung hoi ngan.
 
             CHE DO TRA LOI: %s
             - SIMPLE: 1 doan ngan + vi du ngan (neu can)
@@ -74,6 +76,9 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             - Khoa hoc hien tai: %s
             - Tien do hoan thanh: %d%%
             - Bai hoc hien tai: %s
+
+            Lich su hoi thoai gan day:
+            %s
 
             Context:
             %s
@@ -101,7 +106,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
     @Value("${gemini.api-key:}")
     private String geminiApiKey;
 
-    @Value("${gemini.model:gemini-1.5-flash}")
+    @Value("${gemini.model:gemini-2.5-flash}")
     private String geminiModel;
 
     @Value("${gemini.base-url:https://generativelanguage.googleapis.com/v1beta}")
@@ -110,7 +115,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
     @Value("${gemini.timeout-seconds:60}")
     private int timeoutSeconds;
 
-    @Value("${gemini.advanced-model:gemini-1.5-pro}")
+    @Value("${gemini.advanced-model:gemini-2.5-pro}")
     private String geminiAdvancedModel;
 
     @Value("${gemini.temperature.simple:0.3}")
@@ -131,6 +136,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
         String question = normalize(request.getUserQuestion());
         AssistantContextData assistantContextData = buildAssistantContext(currentUserId, request);
         String context = limitText(assistantContextData.context(), Math.max(maxContextChars, 2000));
+        String chatHistory = limitText(buildChatHistoryContext(request.getChatHistory()), 2000);
         boolean complex = isComplexQuestion(question);
         String answerMode = complex ? "COMPLEX" : "SIMPLE";
         String prompt = PROMPT_TEMPLATE.formatted(
@@ -139,6 +145,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
                 assistantContextData.courseName(),
                 assistantContextData.progressPercent(),
                 assistantContextData.currentLesson(),
+                chatHistory,
                 context,
                 question
         );
@@ -235,6 +242,26 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String buildChatHistoryContext(List<LearningAssistantPromptRequestDto.ChatMessageDto> chatHistory) {
+        if (chatHistory == null || chatHistory.isEmpty()) {
+            return "Khong co";
+        }
+
+        return chatHistory.stream()
+                .filter(message -> message != null && !normalize(message.getContent()).isEmpty())
+                .limit(8)
+                .map(message -> {
+                    String role = normalize(message.getRole()).toLowerCase();
+                    String roleLabel = switch (role) {
+                        case "assistant", "ai", "bot" -> "Tro ly";
+                        case "system" -> "He thong";
+                        default -> "Hoc vien";
+                    };
+                    return "- " + roleLabel + ": " + normalize(message.getContent());
+                })
+                .collect(Collectors.joining("\n"));
     }
 
     private AssistantContextData buildAssistantContext(UUID currentUserId, LearningAssistantPromptRequestDto request) {

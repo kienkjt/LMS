@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -33,6 +34,17 @@ public class LearningAssistantPromptRequestDto {
     @Builder.Default
     private Boolean includeSystemContext = Boolean.TRUE;
 
+    private List<ChatMessageDto> chatHistory;
+
     @NotBlank
     private String userQuestion;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ChatMessageDto {
+        private String role;
+        private String content;
+    }
 }
