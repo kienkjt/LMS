@@ -47,8 +47,8 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
     @Value("${app.withdrawal.commission-rate:10}")
     private BigDecimal defaultCommissionRate;
 
-    @Value("${app.withdrawal.settlement-delay-days:7}")
-    private long settlementDelayDays;
+    @Value("${app.withdrawal.settlement-delay-minutes:10080}")
+    private long settlementDelayMinutes;
 
     private final InstructorWalletRepository walletRepository;
     private final WithdrawalRequestRepository withdrawalRepository;
@@ -87,7 +87,7 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
                 .commissionAmount(commissionAmount)
                 .netAmount(netAmount)
                 .reason("Pending settlement for order: " + orderId)
-                .availableAt(now.plusDays(settlementDelayDays))
+                .availableAt(now.plusMinutes(settlementDelayMinutes))
                 .build();
         withdrawalRepository.save(settlement);
 
