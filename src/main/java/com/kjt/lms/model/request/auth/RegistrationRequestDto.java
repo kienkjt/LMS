@@ -19,7 +19,7 @@ public class RegistrationRequestDto {
     private String password;
 
     @NotBlank(message = "{validation.name.notBlank}")
-    @Size(min = 2, message = "{validation.name.size}")
+    @Size(min = 2, max = 50, message = "{validation.name.size}")
     private String fullName;
 
     @NotBlank(message = "{validation.role.notBlank}")
