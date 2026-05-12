@@ -18,18 +18,18 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
     Optional<UserEntity> findByEmailAndDeletedFalse(String email);
 
     @Query("""
-            SELECT u.id AS id,
-                   u.email AS email,
-                   u.password AS password,
-                   u.isVerified AS verified,
-                   u.isLocked AS locked,
-                   r.code AS roleCode
-            FROM UserEntity u, RoleEntity r
-            WHERE u.roleId = r.id
-              AND u.email = :email
-              AND u.deleted = false
-              AND r.deleted = false
-            """)
+        SELECT u.id AS id,
+               u.email AS email,
+               u.password AS password,
+               u.isVerified AS verified,
+               u.isLocked AS locked,
+               r.code AS roleCode
+        FROM UserEntity u
+        JOIN RoleEntity r ON u.roleId = r.id
+        WHERE u.email = :email
+          AND u.deleted = false
+          AND r.deleted = false
+        """)
     Optional<UserAuthProjection> findAuthByEmail(@Param("email") String email);
 
     long countByDeletedFalse();
