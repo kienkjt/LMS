@@ -349,11 +349,13 @@ public class WithdrawalServiceImpl extends BaseService implements WithdrawalServ
     @Transactional
     @Scheduled(cron = "${app.withdrawal.settlement-release-cron:0 0 * * * *}")
     public int releasePendingEarnings() {
+        LocalDateTime now = LocalDateTime.now();
         List<WithdrawalRequestEntity> settlements =
-                withdrawalRepository.findByTypeAndStatusAndAvailableAtLessThanEqualAndDeletedFalse(
+                withdrawalRepository.findReleasableSettlements(
                         WithdrawalTypeEnum.SETTLEMENT,
                         WithdrawalStatusEnum.PENDING,
-                        LocalDateTime.now()
+                        now,
+                        now.minusMinutes(settlementDelayMinutes)
                 );
 
         int releasedCount = 0;

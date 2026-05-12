@@ -49,10 +49,23 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
             @Param("statuses") Collection<WithdrawalStatusEnum> statuses
     );
 
-    List<WithdrawalRequestEntity> findByTypeAndStatusAndAvailableAtLessThanEqualAndDeletedFalse(
-            WithdrawalTypeEnum type,
-            WithdrawalStatusEnum status,
-            LocalDateTime availableAt
+    @Query("""
+        SELECT w
+        FROM WithdrawalRequestEntity w
+        WHERE w.type = :type
+            AND w.status = :status
+            AND w.deleted = false
+            AND (
+                w.availableAt <= :now
+                OR (w.availableAt IS NULL AND w.createdAt <= :createdBefore)
+                OR w.createdAt <= :createdBefore
+            )
+    """)
+    List<WithdrawalRequestEntity> findReleasableSettlements(
+            @Param("type") WithdrawalTypeEnum type,
+            @Param("status") WithdrawalStatusEnum status,
+            @Param("now") LocalDateTime now,
+            @Param("createdBefore") LocalDateTime createdBefore
     );
 
     List<WithdrawalRequestEntity> findByInstructorIdAndOrderIdAndTypeAndStatusAndDeletedFalse(
