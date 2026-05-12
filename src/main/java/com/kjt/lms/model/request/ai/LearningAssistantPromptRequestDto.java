@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +31,18 @@ public class LearningAssistantPromptRequestDto {
     private String retrievedChunks;
 
     private UUID courseId;
+
+    private String learningGoal;
+
+    private String targetRole;
+
+    @Min(1)
+    @Max(80)
+    private Integer weeklyHours;
+
+    private BigDecimal budgetMax;
+
+    private String preferredCategory;
 
     @Builder.Default
     private Boolean includeSystemContext = Boolean.TRUE;

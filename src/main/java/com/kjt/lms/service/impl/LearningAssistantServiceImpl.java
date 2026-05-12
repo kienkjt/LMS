@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kjt.lms.common.i18n.MessageProvider;
 import com.kjt.lms.common.security.SecurityUtils;
-import com.kjt.lms.exception.BusinessException;
 import com.kjt.lms.model.entity.CourseEntity;
 import com.kjt.lms.model.entity.EnrollmentEntity;
 import com.kjt.lms.model.entity.LessonEntity;
@@ -12,6 +11,7 @@ import com.kjt.lms.model.entity.LessonProgressEntity;
 import com.kjt.lms.model.entity.UserEntity;
 import com.kjt.lms.model.request.ai.LearningAssistantPromptRequestDto;
 import com.kjt.lms.model.response.ai.LearningAssistantPromptResponseDto;
+import com.kjt.lms.repository.CategoryRepository;
 import com.kjt.lms.repository.CourseRepository;
 import com.kjt.lms.repository.EnrollmentRepository;
 import com.kjt.lms.repository.LessonProgressRepository;
@@ -24,15 +24,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -100,6 +103,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CourseRepository courseRepository;
+    private final CategoryRepository categoryRepository;
     private final LessonRepository lessonRepository;
     private final LessonProgressRepository lessonProgressRepository;
 
@@ -135,8 +139,13 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
         UUID currentUserId = securityUtils.getCurrentUserId();
         String question = normalize(request.getUserQuestion());
         AssistantContextData assistantContextData = buildAssistantContext(currentUserId, request);
+        AssistantIntent intent = detectIntent(question);
+        List<LearningAssistantPromptResponseDto.RecommendedCourseDto> recommendedCourses = recommendCourses(request, intent);
+        List<LearningAssistantPromptResponseDto.RoadmapStepDto> roadmap = buildRoadmap(request, recommendedCourses, intent);
+        List<String> followUpQuestions = buildFollowUpQuestions(request, intent);
         String context = limitText(assistantContextData.context(), Math.max(maxContextChars, 2000));
         String chatHistory = limitText(buildChatHistoryContext(request.getChatHistory()), 2000);
+        String recommendationContext = buildRecommendationContext(recommendedCourses, roadmap, intent, request);
         boolean complex = isComplexQuestion(question);
         String answerMode = complex ? "COMPLEX" : "SIMPLE";
         String prompt = PROMPT_TEMPLATE.formatted(
@@ -148,22 +157,40 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
                 chatHistory,
                 context,
                 question
-        );
+        ) + "\n\nThong tin goi y bo sung:\n" + recommendationContext;
 
-        String answer = callGemini(prompt, complex);
+        String answer = generateAnswerWithFallback(prompt, complex, intent, recommendedCourses, roadmap, followUpQuestions);
 
         return LearningAssistantPromptResponseDto.builder()
+                .intent(intent.name())
                 .prompt(prompt)
                 .answer(answer)
+                .followUpQuestions(followUpQuestions)
+                .recommendedCourses(recommendedCourses)
+                .roadmap(roadmap)
                 .build();
     }
 
-    private String callGemini(String prompt, boolean complexMode) {
+    private String generateAnswerWithFallback(
+            String prompt,
+            boolean complexMode,
+            AssistantIntent intent,
+            List<LearningAssistantPromptResponseDto.RecommendedCourseDto> recommendedCourses,
+            List<LearningAssistantPromptResponseDto.RoadmapStepDto> roadmap,
+            List<String> followUpQuestions
+    ) {
         String apiKey = normalize(geminiApiKey);
-        if (apiKey.isEmpty()) {
-            throw new BusinessException(messageProvider.getMessage("exception.ai.missingApiKey"));
+        if (!apiKey.isEmpty()) {
+            try {
+                return callGemini(prompt, complexMode, apiKey);
+            } catch (RuntimeException ex) {
+                log.warn("Falling back to deterministic assistant answer due to AI provider error: {}", ex.getMessage());
+            }
         }
+        return buildDeterministicAnswer(intent, recommendedCourses, roadmap, followUpQuestions);
+    }
 
+    private String callGemini(String prompt, boolean complexMode, String apiKey) {
         try {
             Map<String, Object> payload = new HashMap<>();
             payload.put("contents", List.of(
@@ -193,19 +220,17 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log.error("Gemini API failed with status {} and body {}", response.statusCode(), response.body());
-                throw new BusinessException(messageProvider.getMessage("exception.ai.unavailable"));
+                throw new IllegalStateException(messageProvider.getMessage("exception.ai.unavailable"));
             }
 
             return extractAnswer(response.body());
-        } catch (BusinessException ex) {
-            throw ex;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             log.error("Gemini API call interrupted", ex);
-            throw new BusinessException(messageProvider.getMessage("exception.ai.unavailable"));
+            throw new IllegalStateException(messageProvider.getMessage("exception.ai.unavailable"));
         } catch (IOException ex) {
             log.error("Gemini API call failed", ex);
-            throw new BusinessException(messageProvider.getMessage("exception.ai.unavailable"));
+            throw new IllegalStateException(messageProvider.getMessage("exception.ai.unavailable"));
         }
     }
 
@@ -237,7 +262,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             }
         }
 
-        throw new BusinessException(messageProvider.getMessage("exception.ai.invalidResponse"));
+        throw new IllegalStateException(messageProvider.getMessage("exception.ai.invalidResponse"));
     }
 
     private String normalize(String value) {
@@ -418,5 +443,234 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             String currentLesson,
             String context
     ) {
+    }
+
+    private AssistantIntent detectIntent(String question) {
+        String normalizedQuestion = normalize(question).toLowerCase(Locale.ROOT);
+        if (containsAny(normalizedQuestion, "lo trinh", "roadmap", "ke hoach hoc", "hoc trong bao lau")) {
+            return AssistantIntent.LEARNING_PATH;
+        }
+        if (containsAny(normalizedQuestion, "goi y", "tu van khoa hoc", "khoa hoc nao", "nen hoc khoa nao")) {
+            return AssistantIntent.COURSE_RECOMMENDATION;
+        }
+        if (containsAny(normalizedQuestion, "gia", "hoc phi", "chinh sach", "hoan tien")) {
+            return AssistantIntent.PRICE_POLICY;
+        }
+        return AssistantIntent.STUDY_SUPPORT;
+    }
+
+    private List<LearningAssistantPromptResponseDto.RecommendedCourseDto> recommendCourses(
+            LearningAssistantPromptRequestDto request,
+            AssistantIntent intent
+    ) {
+        if (intent == AssistantIntent.STUDY_SUPPORT) {
+            return List.of();
+        }
+
+        List<CourseEntity> publicCourses = courseRepository.findTrendingPublicCourses(
+                List.of(com.kjt.lms.common.constants.CourseStatusEnum.PUBLISHED, com.kjt.lms.common.constants.CourseStatusEnum.APPROVED),
+                com.kjt.lms.common.constants.CommonStatusEnum.ACTIVE,
+                org.springframework.data.domain.PageRequest.of(0, 30)
+        ).getContent().stream()
+                .map(item -> courseRepository.findByIdAndDeletedFalse(item.getId()).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        String preferredCategory = normalize(request.getPreferredCategory()).toLowerCase(Locale.ROOT);
+        String targetRole = normalize(request.getTargetRole()).toLowerCase(Locale.ROOT);
+        BigDecimal budgetMax = request.getBudgetMax();
+
+        return publicCourses.stream()
+                .filter(course -> budgetMax == null || resolveEffectivePrice(course).compareTo(budgetMax) <= 0)
+                .sorted((a, b) -> Double.compare(scoreCourse(b, preferredCategory, targetRole), scoreCourse(a, preferredCategory, targetRole)))
+                .limit(5)
+                .map(course -> LearningAssistantPromptResponseDto.RecommendedCourseDto.builder()
+                        .courseId(course.getId())
+                        .title(course.getTitle())
+                        .level(course.getLevel() == null ? "UNKNOWN" : course.getLevel().name())
+                        .category(resolveCategoryName(course.getCategoryId()))
+                        .price(course.getPrice())
+                        .discountPrice(course.getDiscountPrice())
+                        .rating(course.getAvgRating())
+                        .totalStudents(course.getTotalStudents())
+                        .reason(buildRecommendationReason(course, preferredCategory, targetRole))
+                        .build())
+                .toList();
+    }
+
+    private List<LearningAssistantPromptResponseDto.RoadmapStepDto> buildRoadmap(
+            LearningAssistantPromptRequestDto request,
+            List<LearningAssistantPromptResponseDto.RecommendedCourseDto> recommendedCourses,
+            AssistantIntent intent
+    ) {
+        if (intent != AssistantIntent.LEARNING_PATH && intent != AssistantIntent.COURSE_RECOMMENDATION) {
+            return List.of();
+        }
+
+        String goal = normalize(request.getLearningGoal()).isEmpty() ? "Dat muc tieu hoc tap" : normalize(request.getLearningGoal());
+        int weeklyHours = request.getWeeklyHours() == null ? 6 : request.getWeeklyHours();
+        List<LearningAssistantPromptResponseDto.RoadmapStepDto> steps = new ArrayList<>();
+        steps.add(buildRoadmapStep(1, "Nen tang", "On lai kien thuc cot loi phuc vu muc tieu: " + goal, weeklyHours, recommendedCourses, 0));
+        steps.add(buildRoadmapStep(2, "Thuc hanh co huong dan", "Hoan thanh bai tap va quiz moi chuong, ghi chu cac loi gap lai", weeklyHours, recommendedCourses, 1));
+        steps.add(buildRoadmapStep(3, "Du an ung dung", "Lam 1 du an mo phong tinh huong thuc te gan voi muc tieu nghe nghiep", weeklyHours, recommendedCourses, 2));
+        steps.add(buildRoadmapStep(4, "Danh gia va nang cap", "Danh gia ket qua, bo sung phan yeu, dat KPI dau ra", weeklyHours, recommendedCourses, 3));
+        return steps;
+    }
+
+    private LearningAssistantPromptResponseDto.RoadmapStepDto buildRoadmapStep(
+            int stepNo,
+            String title,
+            String objective,
+            int weeklyHours,
+            List<LearningAssistantPromptResponseDto.RecommendedCourseDto> recommendedCourses,
+            int courseIndex
+    ) {
+        LearningAssistantPromptResponseDto.RecommendedCourseDto courseRef = recommendedCourses.size() > courseIndex ? recommendedCourses.get(courseIndex) : null;
+        int weeks = switch (stepNo) {
+            case 1 -> 2;
+            case 2 -> 4;
+            case 3 -> 3;
+            default -> 1;
+        };
+        return LearningAssistantPromptResponseDto.RoadmapStepDto.builder()
+                .stepNo(stepNo)
+                .title(title)
+                .objective(objective)
+                .estimatedDuration(weeks + " tuan (~" + (weeks * weeklyHours) + " gio)")
+                .courseId(courseRef == null ? null : courseRef.getCourseId())
+                .courseTitle(courseRef == null ? null : courseRef.getTitle())
+                .build();
+    }
+
+    private List<String> buildFollowUpQuestions(LearningAssistantPromptRequestDto request, AssistantIntent intent) {
+        List<String> questions = new ArrayList<>();
+        if (normalize(request.getLearningGoal()).isEmpty()) {
+            questions.add("Muc tieu hoc chinh cua ban trong 2-3 thang toi la gi?");
+        }
+        if (request.getWeeklyHours() == null) {
+            questions.add("Moi tuan ban co the hoc bao nhieu gio?");
+        }
+        if ((intent == AssistantIntent.COURSE_RECOMMENDATION || intent == AssistantIntent.LEARNING_PATH) && request.getBudgetMax() == null) {
+            questions.add("Ban muon muc hoc phi toi da cho moi khoa hoc la bao nhieu?");
+        }
+        return questions.stream().limit(2).toList();
+    }
+
+    private String buildRecommendationContext(
+            List<LearningAssistantPromptResponseDto.RecommendedCourseDto> recommendedCourses,
+            List<LearningAssistantPromptResponseDto.RoadmapStepDto> roadmap,
+            AssistantIntent intent,
+            LearningAssistantPromptRequestDto request
+    ) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("- Intent: ").append(intent.name()).append("\n");
+        builder.append("- Learning goal: ").append(normalize(request.getLearningGoal())).append("\n");
+        if (!recommendedCourses.isEmpty()) {
+            builder.append("- Khoa hoc goi y:\n");
+            for (LearningAssistantPromptResponseDto.RecommendedCourseDto course : recommendedCourses) {
+                builder.append("  + ").append(course.getTitle()).append(" | ").append(course.getReason()).append("\n");
+            }
+        }
+        if (!roadmap.isEmpty()) {
+            builder.append("- Lo trinh goi y:\n");
+            for (LearningAssistantPromptResponseDto.RoadmapStepDto step : roadmap) {
+                builder.append("  + Buoc ").append(step.getStepNo()).append(": ").append(step.getTitle()).append(" - ")
+                        .append(step.getObjective()).append("\n");
+            }
+        }
+        return builder.toString().trim();
+    }
+
+    private String buildDeterministicAnswer(
+            AssistantIntent intent,
+            List<LearningAssistantPromptResponseDto.RecommendedCourseDto> recommendedCourses,
+            List<LearningAssistantPromptResponseDto.RoadmapStepDto> roadmap,
+            List<String> followUpQuestions
+    ) {
+        StringBuilder answer = new StringBuilder();
+        answer.append("Intent: ").append(intent.name()).append(". ");
+        if (!recommendedCourses.isEmpty()) {
+            answer.append("Minh goi y ").append(recommendedCourses.size()).append(" khoa hoc phu hop: ");
+            answer.append(recommendedCourses.stream().map(LearningAssistantPromptResponseDto.RecommendedCourseDto::getTitle).collect(Collectors.joining(", ")));
+            answer.append(". ");
+        }
+        if (!roadmap.isEmpty()) {
+            answer.append("Lo trinh hoc de xuat gom ").append(roadmap.size()).append(" buoc tu nen tang den du an ung dung. ");
+        }
+        if (!followUpQuestions.isEmpty()) {
+            answer.append("Can them thong tin: ").append(String.join(" | ", followUpQuestions));
+        }
+        if (answer.toString().trim().equals("Intent: STUDY_SUPPORT.")) {
+            answer.append("Ban hay gui cau hoi hoc tap cu the kem bai hoc/chuong dang hoc de minh ho tro chinh xac.");
+        }
+        return answer.toString().trim();
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private double scoreCourse(CourseEntity course, String preferredCategory, String targetRole) {
+        double score = 0.0;
+        if (!preferredCategory.isEmpty() && resolveCategoryName(course.getCategoryId()).toLowerCase(Locale.ROOT).contains(preferredCategory)) {
+            score += 2.0;
+        }
+        if (!targetRole.isEmpty()) {
+            String title = normalize(course.getTitle()).toLowerCase(Locale.ROOT);
+            String desc = normalize(course.getShortDescription()).toLowerCase(Locale.ROOT);
+            if (title.contains(targetRole) || desc.contains(targetRole)) {
+                score += 1.5;
+            }
+        }
+        score += course.getAvgRating() == null ? 0.0 : course.getAvgRating();
+        score += (course.getTotalStudents() == null ? 0 : Math.min(1000, course.getTotalStudents())) / 1000.0;
+        return score;
+    }
+
+    private BigDecimal resolveEffectivePrice(CourseEntity course) {
+        return course.getDiscountPrice() != null ? course.getDiscountPrice() : course.getPrice();
+    }
+
+    private String resolveCategoryName(UUID categoryId) {
+        if (categoryId == null) {
+            return "Unknown";
+        }
+        return categoryRepository.findByIdAndDeletedFalse(categoryId)
+                .map(c -> normalize(c.getName()))
+                .filter(name -> !name.isEmpty())
+                .orElse("Unknown");
+    }
+
+    private String buildRecommendationReason(CourseEntity course, String preferredCategory, String targetRole) {
+        List<String> reasons = new ArrayList<>();
+        String category = resolveCategoryName(course.getCategoryId());
+        if (!preferredCategory.isEmpty() && category.toLowerCase(Locale.ROOT).contains(preferredCategory)) {
+            reasons.add("Dung chu de ban dang quan tam");
+        }
+        if (!targetRole.isEmpty()) {
+            String content = (normalize(course.getTitle()) + " " + normalize(course.getShortDescription())).toLowerCase(Locale.ROOT);
+            if (content.contains(targetRole)) {
+                reasons.add("Noi dung lien quan muc tieu nghe nghiep");
+            }
+        }
+        if (course.getAvgRating() != null && course.getAvgRating() >= 4.5) {
+            reasons.add("Danh gia cao tu hoc vien");
+        }
+        if (reasons.isEmpty()) {
+            reasons.add("Phu hop de bat dau va de xay dung nen tang");
+        }
+        return String.join("; ", reasons);
+    }
+
+    private enum AssistantIntent {
+        COURSE_RECOMMENDATION,
+        STUDY_SUPPORT,
+        LEARNING_PATH,
+        PRICE_POLICY
     }
 }
