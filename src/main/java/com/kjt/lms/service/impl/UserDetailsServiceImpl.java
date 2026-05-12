@@ -1,14 +1,13 @@
 package com.kjt.lms.service.impl;
 
-import com.kjt.lms.model.entity.RoleEntity;
-import com.kjt.lms.model.entity.UserEntity;
-import com.kjt.lms.repository.RoleRepository;
+import com.kjt.lms.common.security.LmsUserPrincipal;
 import com.kjt.lms.repository.UserRepository;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 
@@ -16,30 +15,24 @@ import java.util.Collections;
 public class UserDetailsServiceImpl implements UserDetailsService {
 
     private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    public UserDetailsServiceImpl(UserRepository userRepository, RoleRepository roleRepository) {
+
+    public UserDetailsServiceImpl(UserRepository userRepository) {
         this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
     }
+
     @Override
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        UserRepository.UserAuthProjection user = userRepository.findAuthByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Khong tim thay nguoi dung: " + email));
 
-        UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng: " + email));
-
-        RoleEntity role = roleRepository.findById(user.getRoleId())
-                .orElseThrow(() -> new RuntimeException("Role not found for user: " + email));
-
-        // Validate and normalize role code
-        String roleCode = role.getCode();
+        String roleCode = user.getRoleCode();
         if (roleCode == null || roleCode.trim().isEmpty()) {
             throw new RuntimeException("Role code is null or empty for user: " + email);
         }
 
-        // Trim and convert to uppercase
         roleCode = roleCode.trim().toUpperCase();
 
-        // Ensure ROLE_ prefix is present exactly once
         String authority;
         if (roleCode.startsWith("ROLE_")) {
             authority = roleCode;
@@ -47,15 +40,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             authority = "ROLE_" + roleCode;
         }
 
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getEmail())
-                .password(user.getPassword())
-                .accountLocked(Boolean.TRUE.equals(user.getIsLocked()))
-                .disabled(!Boolean.TRUE.equals(user.getIsVerified()))
-                .authorities(Collections.singletonList(
-                        new SimpleGrantedAuthority(authority)
-                ))
-                .build();
+        return new LmsUserPrincipal(
+                user.getId(),
+                user.getEmail(),
+                user.getPassword(),
+                Boolean.TRUE.equals(user.getVerified()),
+                !Boolean.TRUE.equals(user.getLocked()),
+                Collections.singletonList(new SimpleGrantedAuthority(authority))
+        );
     }
 }
-

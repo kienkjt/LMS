@@ -32,6 +32,11 @@ public class SecurityUtils {
             throw new ResourceNotFoundException(messageProvider.getMessage("exception.auth.unauthenticated"));
         }
 
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof LmsUserPrincipal lmsUserPrincipal) {
+            return lmsUserPrincipal.getId();
+        }
+
         String email = authentication.getName();
         return userRepository.findByEmail(email)
                 .map(UserEntity::getId)

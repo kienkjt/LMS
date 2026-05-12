@@ -305,7 +305,6 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     }
 
     @Override
-    @Transactional
     public CourseUpdateResponseDto uploadCourseImage(UUID courseId, MultipartFile file) {
         CourseEntity course = getOwnedCourse(courseId);
 
@@ -330,7 +329,6 @@ public class CourseServiceImpl extends BaseService implements CourseService {
     }
 
     @Override
-    @Transactional
     public CourseUpdateResponseDto uploadCoursePreviewVideo(UUID courseId, MultipartFile file) {
         CourseEntity course = getOwnedCourse(courseId);
 
