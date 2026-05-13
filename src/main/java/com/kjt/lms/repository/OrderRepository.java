@@ -86,7 +86,21 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
               AND (:minAmount IS NULL OR o.final_amount >= :minAmount)
               AND (:maxAmount IS NULL OR o.final_amount <= :maxAmount)
             ORDER BY o.created_at DESC
-            """, nativeQuery = true)
+            """,
+            countQuery = """
+            SELECT COUNT(*) FROM orders o
+            LEFT JOIN users u ON o.student_id = u.id
+            WHERE o.deleted = false
+              AND (o.order_code LIKE CONCAT('%', :keyword, '%')
+                   OR u.full_name LIKE CONCAT('%', :keyword, '%')
+                   OR u.email LIKE CONCAT('%', :keyword, '%'))
+              AND (:status IS NULL OR o.status = :status)
+              AND (:fromDate IS NULL OR o.created_at >= :fromDate)
+              AND (:toDate IS NULL OR o.created_at <= :toDate)
+              AND (:minAmount IS NULL OR o.final_amount >= :minAmount)
+              AND (:maxAmount IS NULL OR o.final_amount <= :maxAmount)
+            """,
+            nativeQuery = true)
     Page<OrderEntity> findOrdersWithFilter(
             @Param("keyword") String keyword,
             @Param("status") String status,
