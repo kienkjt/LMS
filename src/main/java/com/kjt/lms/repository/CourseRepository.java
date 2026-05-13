@@ -16,6 +16,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -318,4 +319,20 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
     long countByStatusAndDeletedFalse(CourseStatusEnum status);
 
     long countByInstructorIdAndStatusAndDeletedFalse(UUID instructorId, CourseStatusEnum status);
+
+    /**
+     * Get all public courses (for AI assistant to fetch full context)
+     */
+    @Query("""
+            SELECT c
+            FROM CourseEntity c
+            WHERE c.status IN :statuses
+              AND c.active = :active
+              AND c.deleted = false
+            ORDER BY COALESCE(c.totalStudents, 0) DESC, COALESCE(c.avgRating, 0) DESC, c.createdAt DESC
+            """)
+    List<CourseEntity> findAllPublicCourses(
+            @Param("statuses") Collection<CourseStatusEnum> statuses,
+            @Param("active") CommonStatusEnum active
+    );
 }

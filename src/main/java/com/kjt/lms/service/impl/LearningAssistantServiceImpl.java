@@ -406,7 +406,54 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             }
         }
 
+        // Add information about all available public courses for AI reference
+        systemContext.append("\n").append(buildPublicCoursesContext());
+
         return systemContext.toString();
+    }
+
+    private String buildPublicCoursesContext() {
+        StringBuilder coursesContext = new StringBuilder();
+        coursesContext.append("Danh sach tat ca khoa hoc cong khai trong he thong:\n");
+
+        List<CourseEntity> publicCourses = courseRepository.findAllPublicCourses(
+                List.of(com.kjt.lms.common.constants.CourseStatusEnum.PUBLISHED, com.kjt.lms.common.constants.CourseStatusEnum.APPROVED),
+                com.kjt.lms.common.constants.CommonStatusEnum.ACTIVE
+        );
+
+        if (publicCourses.isEmpty()) {
+            coursesContext.append("Khong co khoa hoc nao.");
+            return coursesContext.toString();
+        }
+
+        coursesContext.append("Tong so: ").append(publicCourses.size()).append(" khoa hoc\n\n");
+
+        // Group courses by category and add summary
+        Map<String, List<CourseEntity>> coursesByCategory = publicCourses.stream()
+                .collect(Collectors.groupingBy(course -> resolveCategoryName(course.getCategoryId())));
+
+        for (Map.Entry<String, List<CourseEntity>> entry : coursesByCategory.entrySet()) {
+            coursesContext.append("Category: ").append(entry.getKey()).append(" (").append(entry.getValue().size()).append(" courses)\n");
+            for (CourseEntity course : entry.getValue().stream().limit(10).toList()) {
+                coursesContext.append("  * ").append(normalize(course.getTitle()))
+                        .append(" | Level: ").append(course.getLevel() == null ? "N/A" : course.getLevel().name())
+                        .append(" | Price: ").append(course.getPrice())
+                        .append(" | Rating: ").append(course.getAvgRating() == null ? "0" : course.getAvgRating())
+                        .append(" | Students: ").append(course.getTotalStudents() == null ? "0" : course.getTotalStudents())
+                        .append(" | ").append(normalize(course.getShortDescription(), 100)).append("\n");
+            }
+            coursesContext.append("\n");
+        }
+
+        return limitText(coursesContext.toString(), maxContextChars / 2);
+    }
+
+    private String normalize(String value, int maxLength) {
+        String normalized = normalize(value);
+        if (normalized.length() > maxLength) {
+            return normalized.substring(0, maxLength) + "...";
+        }
+        return normalized;
     }
 
     private String resolveModel(boolean complexMode) {
@@ -467,14 +514,11 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
             return List.of();
         }
 
-        List<CourseEntity> publicCourses = courseRepository.findTrendingPublicCourses(
+        // Fetch ALL public courses for AI assistant to analyze when user asks about courses
+        List<CourseEntity> publicCourses = courseRepository.findAllPublicCourses(
                 List.of(com.kjt.lms.common.constants.CourseStatusEnum.PUBLISHED, com.kjt.lms.common.constants.CourseStatusEnum.APPROVED),
-                com.kjt.lms.common.constants.CommonStatusEnum.ACTIVE,
-                org.springframework.data.domain.PageRequest.of(0, 30)
-        ).getContent().stream()
-                .map(item -> courseRepository.findByIdAndDeletedFalse(item.getId()).orElse(null))
-                .filter(java.util.Objects::nonNull)
-                .toList();
+                com.kjt.lms.common.constants.CommonStatusEnum.ACTIVE
+        );
 
         String preferredCategory = normalize(request.getPreferredCategory()).toLowerCase(Locale.ROOT);
         String targetRole = normalize(request.getTargetRole()).toLowerCase(Locale.ROOT);
@@ -565,17 +609,25 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
         StringBuilder builder = new StringBuilder();
         builder.append("- Intent: ").append(intent.name()).append("\n");
         builder.append("- Learning goal: ").append(normalize(request.getLearningGoal())).append("\n");
+
         if (!recommendedCourses.isEmpty()) {
             builder.append("- Khoa hoc goi y:\n");
             for (LearningAssistantPromptResponseDto.RecommendedCourseDto course : recommendedCourses) {
-                builder.append("  + ").append(course.getTitle()).append(" | ").append(course.getReason()).append("\n");
+                builder.append("  + ").append(course.getTitle())
+                        .append(" | Level: ").append(course.getLevel())
+                        .append(" | Category: ").append(course.getCategory())
+                        .append(" | Price: ").append(course.getPrice())
+                        .append(" | Rating: ").append(course.getRating())
+                        .append(" | Students: ").append(course.getTotalStudents())
+                        .append(" | Reason: ").append(course.getReason()).append("\n");
             }
         }
+
         if (!roadmap.isEmpty()) {
             builder.append("- Lo trinh goi y:\n");
             for (LearningAssistantPromptResponseDto.RoadmapStepDto step : roadmap) {
                 builder.append("  + Buoc ").append(step.getStepNo()).append(": ").append(step.getTitle()).append(" - ")
-                        .append(step.getObjective()).append("\n");
+                        .append(step.getObjective()).append(" (Thoi han: ").append(step.getEstimatedDuration()).append(")\n");
             }
         }
         return builder.toString().trim();
