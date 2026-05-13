@@ -22,4 +22,8 @@ public interface ReviewService {
     void deleteMyReview(UUID courseId);
 
     ReviewResponseDto replyReview(UUID courseId, UUID reviewId, ReplyReviewRequestDto request);
+
+    Page<ReviewResponseDto> getAdminReviews(Pageable pageable);
+
+    void deleteReviewByAdmin(UUID reviewId);
 }

@@ -139,6 +139,27 @@ public class ReviewServiceImpl extends BaseService implements ReviewService {
         return toResponse(reviewRepository.save(review));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReviewResponseDto> getAdminReviews(Pageable pageable) {
+        return reviewRepository.findByDeletedFalseOrderByCreatedAtDesc(pageable)
+                .map(this::toResponse);
+    }
+
+    @Override
+    @Transactional
+    public void deleteReviewByAdmin(UUID reviewId) {
+        ReviewEntity review = reviewRepository.findByIdAndDeletedFalse(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException(messageProvider.getMessage("exception.review.notFound")));
+
+        review.setDeleted(true);
+        reviewRepository.save(review);
+
+        courseRepository.findById(review.getCourseId())
+                .filter(course -> !Boolean.TRUE.equals(course.getDeleted()))
+                .ifPresent(this::refreshCourseReviewStats);
+    }
+
     private void validateStudentCanReview(UUID studentId, CourseEntity course) {
         if (course.getInstructorId().equals(studentId)) {
             throw new BusinessException(messageProvider.getMessage("exception.review.ownCourse"));

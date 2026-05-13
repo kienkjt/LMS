@@ -26,6 +26,10 @@ public interface ReviewRepository extends JpaRepository<ReviewEntity, UUID> {
 
     Optional<ReviewEntity> findByIdAndCourseIdAndDeletedFalse(UUID id, UUID courseId);
 
+    Optional<ReviewEntity> findByIdAndDeletedFalse(UUID id);
+
+    Page<ReviewEntity> findByDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
+
     @Query("""
             SELECT COALESCE(AVG(r.rating), 0)
             FROM ReviewEntity r
