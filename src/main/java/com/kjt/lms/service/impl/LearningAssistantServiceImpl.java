@@ -617,6 +617,7 @@ public class LearningAssistantServiceImpl implements LearningAssistantService {
                         .append(" | Level: ").append(course.getLevel())
                         .append(" | Category: ").append(course.getCategory())
                         .append(" | Price: ").append(course.getPrice())
+                        .append(" | Discount: ").append(course.getDiscountPrice() == null ? "N/A" : course.getDiscountPrice())
                         .append(" | Rating: ").append(course.getRating())
                         .append(" | Students: ").append(course.getTotalStudents())
                         .append(" | Reason: ").append(course.getReason()).append("\n");
