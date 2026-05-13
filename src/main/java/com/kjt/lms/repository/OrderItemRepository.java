@@ -56,6 +56,23 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID
             @Param("status") OrderStatusEnum status);
 
     @Query("""
+            SELECT COALESCE(SUM(oi.instructorRevenue), 0)
+            FROM OrderItemEntity oi, OrderEntity o
+            WHERE oi.orderId = o.id
+              AND oi.instructorId = :instructorId
+              AND o.status = :status
+              AND oi.deleted = false
+              AND o.deleted = false
+              AND o.paidAt >= :fromDate
+              AND o.paidAt <= :toDate
+            """)
+    BigDecimal sumInstructorRevenueByStatusAndPaidAtBetween(
+            @Param("instructorId") UUID instructorId,
+            @Param("status") OrderStatusEnum status,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate);
+
+    @Query("""
             SELECT COUNT(oi)
             FROM OrderItemEntity oi, OrderEntity o
             WHERE oi.orderId = o.id
@@ -67,6 +84,23 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID
     long countSoldItemsByInstructorAndStatus(
             @Param("instructorId") UUID instructorId,
             @Param("status") OrderStatusEnum status);
+
+    @Query("""
+            SELECT COUNT(oi)
+            FROM OrderItemEntity oi, OrderEntity o
+            WHERE oi.orderId = o.id
+              AND oi.instructorId = :instructorId
+              AND o.status = :status
+              AND oi.deleted = false
+              AND o.deleted = false
+              AND o.paidAt >= :fromDate
+              AND o.paidAt <= :toDate
+            """)
+    long countSoldItemsByInstructorAndStatusAndPaidAtBetween(
+            @Param("instructorId") UUID instructorId,
+            @Param("status") OrderStatusEnum status,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate);
 
     @Query("""
             SELECT new com.kjt.lms.model.response.dashboard.TopCourseDashboardDto(
@@ -94,6 +128,33 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID
                 c.id,
                 c.title,
                 CAST(COUNT(oi) AS long),
+                CAST(COALESCE(SUM(oi.paidPrice), 0) AS java.math.BigDecimal),
+                COALESCE(c.avgRating, 0.0),
+                c.totalStudents
+            )
+            FROM OrderItemEntity oi, OrderEntity o, CourseEntity c
+            WHERE oi.orderId = o.id
+              AND oi.courseId = c.id
+              AND o.status = :status
+              AND oi.deleted = false
+              AND o.deleted = false
+              AND c.deleted = false
+              AND o.paidAt >= :fromDate
+              AND o.paidAt <= :toDate
+            GROUP BY c.id, c.title, c.avgRating, c.totalStudents
+            ORDER BY COALESCE(SUM(oi.paidPrice), 0) DESC, COUNT(oi) DESC
+            """)
+    List<TopCourseDashboardDto> findTopSellingCoursesByPaidAtBetween(
+            @Param("status") OrderStatusEnum status,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
+            Pageable pageable);
+
+    @Query("""
+            SELECT new com.kjt.lms.model.response.dashboard.TopCourseDashboardDto(
+                c.id,
+                c.title,
+                CAST(COUNT(oi) AS long),
                 CAST(COALESCE(SUM(oi.instructorRevenue), 0) AS java.math.BigDecimal),
                 COALESCE(c.avgRating, 0.0),
                 c.totalStudents
@@ -112,6 +173,35 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID
     List<TopCourseDashboardDto> findTopSellingCoursesByInstructor(
             @Param("instructorId") UUID instructorId,
             @Param("status") OrderStatusEnum status,
+            Pageable pageable);
+
+    @Query("""
+            SELECT new com.kjt.lms.model.response.dashboard.TopCourseDashboardDto(
+                c.id,
+                c.title,
+                CAST(COUNT(oi) AS long),
+                CAST(COALESCE(SUM(oi.instructorRevenue), 0) AS java.math.BigDecimal),
+                COALESCE(c.avgRating, 0.0),
+                c.totalStudents
+            )
+            FROM OrderItemEntity oi, OrderEntity o, CourseEntity c
+            WHERE oi.orderId = o.id
+              AND oi.courseId = c.id
+              AND oi.instructorId = :instructorId
+              AND o.status = :status
+              AND oi.deleted = false
+              AND o.deleted = false
+              AND c.deleted = false
+              AND o.paidAt >= :fromDate
+              AND o.paidAt <= :toDate
+            GROUP BY c.id, c.title, c.avgRating, c.totalStudents
+            ORDER BY COALESCE(SUM(oi.instructorRevenue), 0) DESC, COUNT(oi) DESC
+            """)
+    List<TopCourseDashboardDto> findTopSellingCoursesByInstructorAndPaidAtBetween(
+            @Param("instructorId") UUID instructorId,
+            @Param("status") OrderStatusEnum status,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
             Pageable pageable);
 
     @Query(value = """

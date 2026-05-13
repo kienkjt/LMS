@@ -307,8 +307,13 @@ public interface CourseRepository extends JpaRepository<CourseEntity, UUID> {
     Optional<String> findInstructorNameByCourseId(@Param("courseId") UUID courseId);
 
     long countByDeletedFalse();
+    long countByDeletedFalseAndCreatedAtBetween(java.time.LocalDateTime fromDate, java.time.LocalDateTime toDate);
 
     long countByInstructorIdAndDeletedFalse(UUID instructorId);
+    long countByInstructorIdAndDeletedFalseAndCreatedAtBetween(
+            UUID instructorId,
+            java.time.LocalDateTime fromDate,
+            java.time.LocalDateTime toDate);
 
     long countByStatusAndDeletedFalse(CourseStatusEnum status);
 

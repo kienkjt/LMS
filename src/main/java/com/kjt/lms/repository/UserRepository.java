@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,6 +44,21 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID>, JpaSpec
               AND r.deleted = false
             """)
     long countByRoleCode(@Param("roleCode") String roleCode);
+
+    @Query("""
+            SELECT COUNT(u)
+            FROM UserEntity u, RoleEntity r
+            WHERE u.roleId = r.id
+              AND r.code = :roleCode
+              AND u.deleted = false
+              AND r.deleted = false
+              AND u.createdAt >= :fromDate
+              AND u.createdAt <= :toDate
+            """)
+    long countByRoleCodeAndCreatedAtBetween(
+            @Param("roleCode") String roleCode,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate);
 
     @Query("""
             SELECT u

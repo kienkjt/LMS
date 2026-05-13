@@ -25,6 +25,7 @@ public interface EnrollmentRepository extends JpaRepository<EnrollmentEntity, UU
     List<EnrollmentEntity> findByStudentIdAndDeletedFalse(UUID studentId);
 
     long countByDeletedFalse();
+    long countByDeletedFalseAndCreatedAtBetween(LocalDateTime fromDate, LocalDateTime toDate);
 
     long countByCourseIdAndDeletedFalse(UUID courseId);
 
@@ -37,6 +38,21 @@ public interface EnrollmentRepository extends JpaRepository<EnrollmentEntity, UU
               AND c.deleted = false
             """)
     long countByInstructorId(@Param("instructorId") UUID instructorId);
+
+    @Query("""
+            SELECT COUNT(e)
+            FROM EnrollmentEntity e, CourseEntity c
+            WHERE e.courseId = c.id
+              AND c.instructorId = :instructorId
+              AND e.deleted = false
+              AND c.deleted = false
+              AND e.createdAt >= :fromDate
+              AND e.createdAt <= :toDate
+            """)
+    long countByInstructorIdAndCreatedAtBetween(
+            @Param("instructorId") UUID instructorId,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate);
 
     @Query(value = """
             SELECT DATE_FORMAT(e.created_at, '%Y-%m-%d') AS label,

@@ -42,6 +42,32 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
             """)
     BigDecimal sumFinalAmountByStatus(@Param("status") OrderStatusEnum status);
 
+    @Query("""
+            SELECT COUNT(o)
+            FROM OrderEntity o
+            WHERE o.status = :status
+              AND o.deleted = false
+              AND o.paidAt >= :fromDate
+              AND o.paidAt <= :toDate
+            """)
+    long countByStatusAndPaidAtBetween(
+            @Param("status") OrderStatusEnum status,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate);
+
+    @Query("""
+            SELECT COALESCE(SUM(o.finalAmount), 0)
+            FROM OrderEntity o
+            WHERE o.status = :status
+              AND o.deleted = false
+              AND o.paidAt >= :fromDate
+              AND o.paidAt <= :toDate
+            """)
+    BigDecimal sumFinalAmountByStatusAndPaidAtBetween(
+            @Param("status") OrderStatusEnum status,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate);
+
     @Query(value = """
             SELECT DATE_FORMAT(o.paid_at, '%Y-%m-%d') AS label,
                    COALESCE(SUM(o.final_amount), 0) AS amount,
