@@ -51,7 +51,7 @@ public class ReviewController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR')")
     @Operation(summary = "Get current student's review for a course", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<ReviewResponseDto>> getMyReview(@PathVariable UUID courseId) {
         ReviewResponseDto response = reviewService.getMyReview(courseId);
@@ -59,7 +59,7 @@ public class ReviewController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR')")
     @Operation(summary = "Create a course review", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<ReviewResponseDto>> createReview(
             @PathVariable UUID courseId,
@@ -69,7 +69,7 @@ public class ReviewController {
     }
 
     @PutMapping("/me")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR')")
     @Operation(summary = "Update current student's review", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<ReviewResponseDto>> updateMyReview(
             @PathVariable UUID courseId,
@@ -79,7 +79,7 @@ public class ReviewController {
     }
 
     @DeleteMapping("/me")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'INSTRUCTOR')")
     @Operation(summary = "Delete current student's review", security = @SecurityRequirement(name = "Bearer"))
     public ResponseEntity<APIResponse<Void>> deleteMyReview(@PathVariable UUID courseId) {
         reviewService.deleteMyReview(courseId);
