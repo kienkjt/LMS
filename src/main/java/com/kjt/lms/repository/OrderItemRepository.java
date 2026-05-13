@@ -19,6 +19,10 @@ import java.util.UUID;
 public interface OrderItemRepository extends JpaRepository<OrderItemEntity, UUID> {
     List<OrderItemEntity> findByOrderId(UUID orderId);
 
+    List<OrderItemEntity> findByOrderIdAndDeletedFalse(UUID orderId);
+
+    int countByOrderIdAndDeletedFalse(UUID orderId);
+
     @Query("""
             SELECT CASE WHEN COUNT(oi) > 0 THEN true ELSE false END
             FROM OrderItemEntity oi, OrderEntity o

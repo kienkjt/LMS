@@ -20,5 +20,5 @@ public interface PaymentService {
 
     OrderResponseDto cancelOrder(UUID orderId);
 
-    OrderResponseDto refundOrder(UUID orderId);
+    OrderResponseDto refundOrder(UUID orderId, String reason);
 }

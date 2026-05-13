@@ -71,4 +71,35 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
     List<TimeSeriesProjection> findMonthlyRevenueTrend(
             @Param("status") String status,
             @Param("fromDate") LocalDateTime fromDate);
+
+
+    @Query(value = """
+            SELECT o.* FROM orders o
+            LEFT JOIN users u ON o.student_id = u.id
+            WHERE o.deleted = false
+              AND (o.order_code LIKE CONCAT('%', :keyword, '%')
+                   OR u.full_name LIKE CONCAT('%', :keyword, '%')
+                   OR u.email LIKE CONCAT('%', :keyword, '%'))
+              AND (:status IS NULL OR o.status = :status)
+              AND (:fromDate IS NULL OR o.created_at >= :fromDate)
+              AND (:toDate IS NULL OR o.created_at <= :toDate)
+              AND (:minAmount IS NULL OR o.final_amount >= :minAmount)
+              AND (:maxAmount IS NULL OR o.final_amount <= :maxAmount)
+            ORDER BY o.created_at DESC
+            """, nativeQuery = true)
+    Page<OrderEntity> findOrdersWithFilter(
+            @Param("keyword") String keyword,
+            @Param("status") String status,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
+            @Param("minAmount") BigDecimal minAmount,
+            @Param("maxAmount") BigDecimal maxAmount,
+            Pageable pageable);
+
+    @Query("""
+            SELECT COUNT(oi) FROM OrderItemEntity oi
+            WHERE oi.orderId = :orderId
+              AND oi.deleted = false
+            """)
+    int countOrderItems(@Param("orderId") UUID orderId);
 }

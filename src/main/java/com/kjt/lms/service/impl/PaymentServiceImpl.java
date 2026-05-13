@@ -26,6 +26,7 @@ import com.kjt.lms.service.WithdrawalService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +64,8 @@ public class PaymentServiceImpl implements PaymentService {
     private final VnPayConfig vnPayConfig;
     private final WithdrawalService withdrawalService;
     private final NotificationService notificationService;
+    @Value("${app.withdrawal.settlement-delay-minutes:10080}")
+    private long settlementDelayMinutes;
 
     @Override
     @Transactional
@@ -194,11 +197,31 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public OrderResponseDto refundOrder(UUID orderId) {
+    public OrderResponseDto refundOrder(UUID orderId, String reason) {
         OrderEntity order = getAccessibleOrder(orderId);
 
-        log.warn("Refund rejected for order {} with status {}", order.getId(), order.getStatus());
-        throw new BusinessException(messageProvider.getMessage("exception.order.notRefundable"));
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new BusinessException("Lý do yêu cầu hoàn tiền không được để trống");
+        }
+
+        if (order.getStatus() != OrderStatusEnum.COMPLETED) {
+            throw new BusinessException(messageProvider.getMessage("exception.order.notRefundable"));
+        }
+        if (order.getPaidAt() == null) {
+            throw new BusinessException(messageProvider.getMessage("exception.order.notRefundable"));
+        }
+
+        LocalDateTime refundDeadline = order.getPaidAt().plusMinutes(settlementDelayMinutes);
+        if (LocalDateTime.now().isAfter(refundDeadline)) {
+            throw new BusinessException(messageProvider.getMessage("exception.order.refundWindowExpired"));
+        }
+
+        String requestNote = "Yêu cầu hoàn tiền bởi học viên. Lý do: " + reason.trim();
+        order.setNote((order.getNote() != null ? order.getNote() + " | " : "") + requestNote);
+        OrderEntity savedOrder = orderRepository.save(order);
+
+        log.info("Refund requested for order {} by student {}", order.getId(), order.getStudentId());
+        return mapToDto(savedOrder);
     }
 
     private OrderResponseDto processMomo(OrderEntity order, String transactionId) {
@@ -452,3 +475,7 @@ public class PaymentServiceImpl implements PaymentService {
         return orderMapper.toResponse(order, items);
     }
 }
+
+
+
+
