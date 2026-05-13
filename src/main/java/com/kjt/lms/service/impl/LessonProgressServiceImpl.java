@@ -9,6 +9,7 @@ import com.kjt.lms.model.entity.EnrollmentEntity;
 import com.kjt.lms.model.entity.LessonEntity;
 import com.kjt.lms.model.entity.LessonProgressEntity;
 import com.kjt.lms.model.entity.UserEntity;
+import com.kjt.lms.model.response.enrollment.InstructorStudentEnrollmentResponseDto;
 import com.kjt.lms.model.response.certificate.CertificateResponseDto;
 import com.kjt.lms.model.response.progress.CourseProgressResponseDto;
 import com.kjt.lms.model.response.progress.LessonProgressDetailResponseDto;
@@ -115,15 +116,12 @@ public class LessonProgressServiceImpl extends BaseService implements LessonProg
         Pageable pageable = PageRequest.of(pageIndex, size);
         List<LessonEntity> lessons = lessonRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtAsc(courseId);
 
-        return enrollmentRepository.findByCourseIdAndDeletedFalseOrderByCreatedAtDesc(courseId, pageable)
-                .map(enrollment -> {
-                    UserEntity student = userRepository.findById(enrollment.getStudentId())
-                            .filter(user -> !Boolean.TRUE.equals(user.getDeleted()))
-                            .orElseThrow(() -> new ResourceNotFoundException(
-                                    messageProvider.getMessage("exception.user.notfound")));
-
-                    return buildStudentCourseProgress(course, enrollment, student, lessons);
-                });
+        return enrollmentRepository.findStudentsByCourseId(courseId, pageable)
+                .map(studentEnrollment -> buildStudentCourseProgress(
+                        course,
+                        studentEnrollment,
+                        lessons
+                ));
     }
 
     @Override
@@ -194,6 +192,58 @@ public class LessonProgressServiceImpl extends BaseService implements LessonProg
                 .progressPercent(progressPercent)
                 .enrolledAt(enrollment.getCreatedAt())
                 .completedAt(enrollment.getCompletedAt())
+                .lessons(lessonProgresses)
+                .build();
+    }
+
+    private StudentCourseProgressResponseDto buildStudentCourseProgress(
+            CourseEntity course,
+            InstructorStudentEnrollmentResponseDto studentEnrollment,
+            List<LessonEntity> lessons) {
+        Map<UUID, LessonProgressEntity> progressByLessonId = lessonProgressRepository
+                .findByStudentIdAndCourseIdAndDeletedFalse(studentEnrollment.getStudentId(), course.getId())
+                .stream()
+                .collect(Collectors.toMap(
+                        LessonProgressEntity::getLessonId,
+                        Function.identity(),
+                        (first, second) -> first
+                ));
+
+        List<LessonProgressDetailResponseDto> lessonProgresses = lessons.stream()
+                .map(lesson -> {
+                    LessonProgressEntity progress = progressByLessonId.get(lesson.getId());
+                    boolean completed = progress != null && Boolean.TRUE.equals(progress.getCompleted());
+
+                    return LessonProgressDetailResponseDto.builder()
+                            .lessonId(lesson.getId())
+                            .chapterId(lesson.getChapterId())
+                            .lessonTitle(lesson.getTitle())
+                            .lessonType(lesson.getType())
+                            .duration(lesson.getDuration())
+                            .completed(completed)
+                            .completedAt(progress != null ? progress.getCompletedAt() : null)
+                            .build();
+                })
+                .toList();
+
+        long completedLessons = lessonProgresses.stream()
+                .filter(lesson -> Boolean.TRUE.equals(lesson.getCompleted()))
+                .count();
+        BigDecimal progressPercent = calculateProgressPercent(completedLessons, lessons.size());
+
+        return StudentCourseProgressResponseDto.builder()
+                .enrollmentId(studentEnrollment.getEnrollmentId())
+                .courseId(course.getId())
+                .courseTitle(course.getTitle())
+                .studentId(studentEnrollment.getStudentId())
+                .studentName(studentEnrollment.getStudentName())
+                .studentEmail(studentEnrollment.getStudentEmail())
+                .studentAvatar(studentEnrollment.getStudentAvatar())
+                .totalLessons(lessons.size())
+                .completedLessons(completedLessons)
+                .progressPercent(progressPercent)
+                .enrolledAt(studentEnrollment.getEnrolledAt())
+                .completedAt(studentEnrollment.getCompletedAt())
                 .lessons(lessonProgresses)
                 .build();
     }
